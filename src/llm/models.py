@@ -13,7 +13,6 @@ def get_model(model_name: str):
     else:
         raise ValueError(f"Unsupported model: {model_name}")
     
-# Global API key managers for different providers
 groq_api_manager = APIKeyManager(
     api_keys=[settings.GROQ_API_KEY1, settings.GROQ_API_KEY2],
     rate_limit=30,

@@ -319,6 +319,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pymongo" },
     { name = "python-dotenv" },
+    { name = "pytz" },
     { name = "rich" },
 ]
 
@@ -328,12 +329,13 @@ requires-dist = [
     { name = "langchain-google-genai", specifier = "==2.0.11" },
     { name = "langchain-groq", specifier = "==0.2.4" },
     { name = "langgraph", specifier = "==0.3.5" },
-    { name = "motor", specifier = ">=3.7.0" },
+    { name = "motor", specifier = "==3.7.0" },
     { name = "pydantic", specifier = "==2.10.3" },
     { name = "pydantic-core", specifier = "==2.27.1" },
     { name = "pydantic-settings", specifier = "==2.7.0" },
     { name = "pymongo", specifier = "==4.11.2" },
     { name = "python-dotenv", specifier = "==1.0.0" },
+    { name = "pytz", specifier = "==2025.1" },
     { name = "rich", specifier = "==13.9.4" },
 ]
 
@@ -825,6 +827,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/31/06/1ef763af20d0572c032fa22882cfbfb005fba6e7300715a37840858c919e/python-dotenv-1.0.0.tar.gz", hash = "sha256:a8df96034aae6d2d50a4ebe8216326c61c3eb64836776504fcca410e5937a3ba", size = 37399 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl", hash = "sha256:f5971a9226b701070a4bf2c38c89e5a3f0d64de8debda981d1db98583009122a", size = 19482 },
+]
+
+[[package]]
+name = "pytz"
+version = "2025.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/57/df1c9157c8d5a05117e455d66fd7cf6dbc46974f832b1058ed4856785d8a/pytz-2025.1.tar.gz", hash = "sha256:c2db42be2a2518b28e65f9207c4d05e6ff547d1efa4086469ef855e4ab70178e", size = 319617 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/38/ac33370d784287baa1c3d538978b5e2ea064d4c1b93ffbd12826c190dd10/pytz-2025.1-py2.py3-none-any.whl", hash = "sha256:89dd22dca55b46eac6eda23b2d72721bf1bdfef212645d81513ef5d03038de57", size = 507930 },
 ]
 
 [[package]]
