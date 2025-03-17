@@ -1291,30 +1291,225 @@ def get_company_peers(
         logger.error(f"Error processing peers data for {symbol}: {str(e)}")
         return None
     
-if __name__ == "__main__":
-    # Test get_stock_sid
-    # sid = get_stock_sid("SHAKTIPUMP", force=True)
-    # print(sid)
+def get_price_movement(
+    symbol: str,
+    exchange: str = "nse",
+    force: bool = False
+) -> Optional[Dict]:
+    """
+    Get price movement data from MarketsMojo
     
-    # # Test get_corporate_announcements
-    # print(get_corporate_announcements("RELIANCE"))
-    
-    # print(get_stock_news("RELIANCE"))
-    
-    print(get_company_dashboard("RELIANCE"))
-    
-    # print(get_fundamental_data(symbol="RELIANCE", period="q"))
-    
-    # print(get_balance_sheet_data("RELIANCE"))
-    
-    # print(get_profit_loss_data("RELIANCE"))
-    
-    # print(get_cash_flow_data("RELIANCE"))
-    
-    # print(get_shareholding_pattern("RELIANCE"))
-    
-    # print(get_stock_quality_ratios("RELIANCE"))
-    
-    print(get_company_peers("RELIANCE", force=True))
+    Args:
+        symbol (str): Stock symbol (e.g., 'RELIANCE')
+        exchange (str): Exchange name ('nse' or 'bse')
+        force (bool): Force fetch from API ignoring cache
+            
+    Returns:
+        Optional[Dict]: Price movement data or None if error occurs
+    """
+    try:
+        # Check in database if force is False
+        if not force:
+            db_result = db.company_dashboard.find_one(
+                {
+                    "symbol": symbol,
+                    "exchange": exchange.lower(),
+                    "price_movement": {"$exists": True},
+                    "price_movement.updated_at": {
+                        "$gte": datetime.now(pytz.UTC) - timedelta(hours=1)  # Cache for 1 hour only
+                    }
+                }
+            )
 
+            if db_result and "price_movement" in db_result:
+                logger.info(f"Found recent price movement data for {symbol}")
+                return db_result["price_movement"]
+
+        # Get SID first
+        sid = get_stock_sid(symbol, exchange)
+        if not sid:
+            logger.error(f"Could not get SID for {symbol}")
+            return None
+
+        # Fetch price movement data
+        url = f"{baseURL}/stocks_Pricemovement/pricemovement_info"
+        params = {
+            "sid": sid,
+            "exchange": 1 if exchange.lower() == "nse" else 0,
+            "1d": ""
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get('code') != "200":
+            logger.error(f"API returned error: {data.get('message')}")
+            return None
+
+        price_data = data.get('data', {}).get('pricemovement', {})
+        other_data = data.get('data', {}).get('pricemovement', {}).get('other_data', {})
+        
+        # Structure the data
+        structured_data = {
+            "message": other_data.get('sentence', {}).get('message'),
+            "message_direction": other_data.get('sentence', {}).get('dir'),
+            "current_price": price_data.get('intraday', {}).get('price'),
+            "trading_info": {
+                "52_week": {
+                    "high": price_data.get('intraday', {}).get('52wk_high'),
+                    "low": price_data.get('intraday', {}).get('52wk_low'),
+                    "pointer": price_data.get('intraday', {}).get('52wk_pointer')
+                },
+                "day_range": {
+                    "high": price_data.get('intraday', {}).get('high'),
+                    "low": price_data.get('intraday', {}).get('low'),
+                    "previous_close": price_data.get('intraday', {}).get('previous_close')
+                }
+            },
+            "stock_details": {},
+            "returns": {},
+            "updated_at": datetime.now(pytz.UTC)
+        }
+
+        # Process stock details
+        for detail in other_data.get('stock_details', []):
+            key = detail['field'].lower().replace(' ', '_')
+            value_data = {
+                "value": detail['value']
+            }
+            if 'dir' in detail:
+                value_data["direction"] = detail['dir']
+            if 'field_suffix' in detail:
+                value_data["suffix"] = detail['field_suffix']
+                
+            structured_data["stock_details"][key] = value_data
+
+        # Process returns data
+        for return_data in other_data.get('return_data', []):
+            period = return_data['field']
+            structured_data["returns"][period] = {
+                "stock": {
+                    "change": return_data['stock_return']['chg'],
+                    "change_percentage": return_data['stock_return']['chgp'],
+                    "direction": return_data['stock_return']['dir']
+                },
+                "sensex": {
+                    "change": return_data['sensex_return']['chg'],
+                    "change_percentage": return_data['sensex_return']['chgp'],
+                    "direction": return_data['sensex_return']['dir']
+                }
+            }
+
+        # Update database
+        db.company_dashboard.update_one(
+            {
+                "symbol": symbol,
+                "exchange": exchange.lower(),
+                "sid": sid
+            },
+            {
+                "$set": {
+                    "price_movement": structured_data
+                }
+            },
+            upsert=True
+        )
+
+        logger.info(f"Successfully fetched and stored price movement data for {symbol}")
+        return structured_data
+
+    except requests.RequestException as e:
+        logger.error(f"Network error fetching price movement data for {symbol}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Error processing price movement data for {symbol}: {str(e)}")
+        return None
+    
+def test_company_data(symbol: str, sector: str):
+    """Helper function to test all data fetching functions for a company"""
+    print(f"\n{'='*80}")
+    print(f"Testing data for {symbol} ({sector})")
+    print(f"{'='*80}")
+
+    print("\n1. Corporate Announcements:")
+    announcements = get_corporate_announcements(symbol)
+    if announcements:
+        print(f"Found {len(announcements.get('board_meetings', []))} board meetings")
+        print(f"Found {len(announcements.get('dividends', []))} dividend announcements")
+
+    print("\n2. Stock News:")
+    news = get_stock_news(symbol)
+    if news:
+        print(f"Found {len(news)} news items")
+
+    print("\n3. Company Dashboard:")
+    dashboard = get_company_dashboard(symbol)
+    if dashboard:
+        print(f"Company Name: {dashboard['company_info']['name']}")
+        print(f"Industry: {dashboard['company_info']['industry']}")
+        print(f"Market Cap: ₹{dashboard['key_metrics']['market_cap']:,.2f} Cr")
+
+    print("\n4. Fundamental Data:")
+    fundamental = get_fundamental_data(symbol, period="q")
+    if fundamental:
+        print(f"Found quarterly data for {len(fundamental['periods'])} periods")
+
+    print("\n5. Balance Sheet:")
+    balance_sheet = get_balance_sheet_data(symbol)
+    if balance_sheet:
+        print(f"Found balance sheet data for {len(balance_sheet['periods'])} periods")
+
+    print("\n6. Profit & Loss:")
+    pnl = get_profit_loss_data(symbol)
+    if pnl:
+        print(f"Found P&L data for {len(pnl['periods'])} periods")
+
+    print("\n7. Cash Flow:")
+    cash_flow = get_cash_flow_data(symbol)
+    if cash_flow:
+        print(f"Found cash flow data for {len(cash_flow['periods'])} periods")
+
+    print("\n8. Shareholding Pattern:")
+    shareholding = get_shareholding_pattern(symbol)
+    if shareholding:
+        print(f"Found shareholding data for {len(shareholding['periods'])} periods")
+
+    print("\n9. Stock Quality Ratios:")
+    quality = get_stock_quality_ratios(symbol)
+    if quality:
+        print(f"Quality Rating: {quality['quality_metrics']['rating']}")
+        print(f"Valuation Rating: {quality['valuation_metrics']['rating']}")
+
+    print("\n10. Company Peers:")
+    peers = get_company_peers(symbol)
+    if peers:
+        print(f"Found {len(peers)} peer companies")
+
+    print("\n11. Price Movement:")
+    price = get_price_movement(symbol)
+    if price:
+        print(f"Current Price: ₹{price['current_price']}")
+        print(f"52W High: ₹{price['trading_info']['52_week']['high']}")
+        print(f"52W Low: ₹{price['trading_info']['52_week']['low']}")
+
+if __name__ == "__main__":
+    # Test companies from different sectors
+    
+    # IT Sector
+    test_company_data("TCS", "Information Technology")
+    
+    # Banking Sector
+    test_company_data("HDFCBANK", "Banking")
+    
+    # Automotive Sector
+    test_company_data("TATAMOTORS", "Automotive")
+    
+    # FMCG Sector
+    test_company_data("HINDUNILVR", "FMCG")
+    
+    # Pharmaceutical Sector
+    test_company_data("SUNPHARMA", "Pharmaceuticals")
+ 
     pass

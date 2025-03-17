@@ -12,3 +12,19 @@ pytz==2025.1
 # Different AI 
 langchain-google-genai==2.0.11
 langchain-groq==0.2.4
+
+yfinance==0.2.54
+nsepythonserver==2.93
+requests-ratelimiter==0.7.0
+pandas==2.2.3
+numpy==2.2.4
+ta-lib==0.6.3
+
+# uv add -r requirements.txt
+
+# tar -xzf ta-lib-0.6.4-src.tar.gz
+# cd ta-lib-0.6.4
+# ./configure --prefix=/usr
+# make
+# sudo make install
+# cd ..
