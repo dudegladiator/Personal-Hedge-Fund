@@ -4,6 +4,7 @@ from utils.config import settings, get_sync_database
 from utils.app_logger import setup_logger
 from src.llm.models import get_model
 from datetime import datetime, timedelta
+from src.prompts import announcements_system_prompt, news_system_prompt
 
 logger = setup_logger("src/agents/sentimental_agent.py")
 db = get_sync_database()
@@ -86,22 +87,42 @@ def get_latest_news(news_list, days):
         return []
 
 def parse_llm_response(response_content):
-    # Search for a JSON object in the response
-    json_pattern = r'\{.*\}'
-    match = re.search(json_pattern, response_content, re.DOTALL)
-    if match:
-        json_str = match.group(0)
+    # Extract thinking/reasoning part
+    thinking_pattern = r'<think>(.*?)</think>'
+    thinking_match = re.search(thinking_pattern, response_content, re.DOTALL)
+    reasoning = thinking_match.group(1).strip() if thinking_match else ""
+
+    # Extract JSON part
+    json_pattern = r'```json\s*(\{.*?\})\s*```'
+    json_match = re.search(json_pattern, response_content, re.DOTALL)
+    
+    if json_match:
+        json_str = json_match.group(1)
         try:
             result = json.loads(json_str)
             # Verify required keys are present
             if "recommendation_sign" in result and "analysis_overview" in result and "recommendation_confidence_score" in result:
+                # Add reasoning to the result
+                result["reasoning"] = reasoning
                 return result
             else:
-                return {"recommendation_sign": "NEUTRAL", "details": "LLM response missing required fields."}
+                return {
+                    "recommendation_sign": "NEUTRAL", 
+                    "details": "LLM response missing required fields.",
+                    "reasoning": reasoning
+                }
         except json.JSONDecodeError:
-            return {"recommendation_sign": "NEUTRAL", "details": "Failed to parse extracted JSON from response."}
+            return {
+                "recommendation_sign": "NEUTRAL", 
+                "details": "Failed to parse extracted JSON from response.",
+                "reasoning": reasoning
+            }
     else:
-        return {"recommendation_sign": "NEUTRAL", "details": "No valid JSON object found in LLM response."}
+        return {
+            "recommendation_sign": "NEUTRAL", 
+            "details": "No valid JSON object found in LLM response.",
+            "reasoning": reasoning
+        }
  
 # Function 1: Analyze latest announcements using Groq
 def get_recommendation_from_announcements(symbol, exchange, past_days=90):
@@ -136,58 +157,6 @@ def get_recommendation_from_announcements(symbol, exchange, past_days=90):
             f"Latest Bonus Issues:\n{json.dumps(bonus_latest, indent=2)}\n\n"
             f"Latest Rights Issues:\n{json.dumps(rights_latest, indent=2)}"
         )
-        
-        # Updated prompt
-        system_content = """You are a financial analyst API specializing in corporate announcement analysis. Your task is to analyze corporate announcements and return a stock recommendation in JSON format.
-
-RECOMMENDATION GUIDELINES:
-1. BULLISH (Strong Buy/Buy):
-   - Clear positive catalysts present
-   - Strong fundamental improvements
-   - Significant corporate actions benefiting shareholders
-
-2. NEUTRAL (Hold):
-   - Mixed or unclear signals
-   - Balanced positive and negative factors
-   - Insufficient data for strong conviction
-
-3. BEARISH (Sell/Strong Sell):
-   - Negative catalysts present
-   - Fundamental deterioration
-   - Corporate actions potentially harming shareholder value
-
-CONFIDENCE SCORE DEFINITIONS:
-0.0-0.2: Very Low Confidence
-- Minimal data available
-- Highly uncertain outcomes
-- Conflicting signals
-
-0.21-0.4: Low Confidence
-- Limited data available
-- Uncertain market conditions
-- Weak correlation between events and potential outcomes
-
-0.41-0.6: Moderate Confidence
-- Adequate data available
-- Some clear signals present
-- Mixed but interpretable indicators
-
-0.61-0.8: High Confidence
-- Strong data support
-- Clear market signals
-- Consistent pattern recognition
-
-0.81-1.0: Very High Confidence
-- Extensive data support
-- Multiple confirming signals
-- Strong historical correlation
-
-CORPORATE ANNOUNCEMENT WEIGHT FACTORS:
-- Board Meetings: Impact on strategic decisions
-- Dividends: Direct shareholder returns
-- Stock Splits: Market accessibility
-- Bonus Issues: Capital structure changes
-- Rights Issues: Funding and dilution impact"""
 
         user_content = (
             f"Analyze the following latest announcements for {symbol} on {exchange}. "
@@ -214,23 +183,17 @@ CORPORATE ANNOUNCEMENT WEIGHT FACTORS:
         completion = groq_client.chat.completions.create(
             model="deepseek-r1-distill-llama-70b",
             messages=[
-                {"role": "system", "content": system_content},
+                {"role": "system", "content": announcements_system_prompt},
                 {"role": "user", "content": user_content}
             ],
             temperature=0.05,
             max_tokens=8000,
-            top_p=0.9,
-            stream=False,
-            stop=None,
-            reasoning_format="parsed"
+            top_p=0.9
         )
         
         # Get response and parse with new logic
         response_content = completion.choices[0].message.content
-        reasoning = completion.choices[0].message.reasoning
         result = parse_llm_response(response_content)
-        # Add reasoning to the result
-        result["analysis"] = reasoning
         # Add datetime of the run
         result["run_datetime"] = datetime.now().isoformat()
         return result
@@ -255,58 +218,6 @@ def get_recommendation_from_news(symbol, exchange, past_days=5):
         
         # Format data (unchanged)
         data_str = f"Latest News:\n{json.dumps(news_latest, indent=2)}"
-        
-        # Updated prompt
-        system_content = """You are a financial analyst API specializing in news sentiment analysis. Your task is to analyze financial news and return a stock recommendation in JSON format.
-
-RECOMMENDATION GUIDELINES:
-1. BULLISH (Strong Buy/Buy):
-   - Positive news catalysts
-   - Strong business performance
-   - Favorable market conditions
-
-2. NEUTRAL (Hold):
-   - Mixed news sentiment
-   - Unclear market direction
-   - Balanced positive/negative coverage
-
-3. BEARISH (Sell/Strong Sell):
-   - Negative news catalysts
-   - Business challenges
-   - Unfavorable market conditions
-
-CONFIDENCE SCORE DEFINITIONS:
-0.0-0.2: Very Low Confidence
-- Limited news coverage
-- Unverified sources
-- Conflicting reports
-
-0.21-0.4: Low Confidence
-- Sparse news coverage
-- Some unreliable sources
-- Unclear impact on stock
-
-0.41-0.6: Moderate Confidence
-- Regular news coverage
-- Mix of reliable sources
-- Measurable market impact
-
-0.61-0.8: High Confidence
-- Substantial news coverage
-- Mostly reliable sources
-- Clear market impact
-
-0.81-1.0: Very High Confidence
-- Extensive news coverage
-- Highly reliable sources
-- Significant market impact
-
-NEWS ANALYSIS WEIGHT FACTORS:
-- Source Credibility: Reliability of news source
-- News Recency: Timing relevance
-- Market Impact: Direct effect on stock price
-- Volume: Amount of coverage
-- Consistency: Agreement across sources"""
 
         user_content = (
             f"Analyze the following latest news for {symbol} on {exchange}. "
@@ -333,29 +244,24 @@ NEWS ANALYSIS WEIGHT FACTORS:
         completion = groq_client.chat.completions.create(
             model="deepseek-r1-distill-llama-70b",
             messages=[
-                {"role": "system", "content": system_content},
+                {"role": "system", "content": news_system_prompt},
                 {"role": "user", "content": user_content}
             ],
             temperature=0.05,
             max_tokens=8000,
-            top_p=0.9,
-            stream=False,
-            stop=None,
-            reasoning_format="parsed"
+            top_p=0.9
         )
-        
         # Get response and parse with new logic
         response_content = completion.choices[0].message.content
-        reasoning = completion.choices[0].message.reasoning
         result = parse_llm_response(response_content)
-        # Add reasoning to the result
-        result["analysis"] = reasoning
         # Add datetime of the run
         result["run_datetime"] = datetime.now().isoformat()
         return result
     
     except Exception as e:
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
+    
+#Add the Agent
     
 # Example usage
 if __name__ == "__main__":

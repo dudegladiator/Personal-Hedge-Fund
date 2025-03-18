@@ -32,8 +32,13 @@ class GrowwStockDetails(BaseModel):
     # Metadata
     updated_at: datetime = datetime.now(pytz.UTC)
 
+class RecommendationSignal(Enum):
+    BULLISH = "BULLISH"
+    NEUTRAL = "NEUTRAL"
+    BEARISH = "BEARISH"
+
 class SentimentAgent(BaseModel):
-    recommendation_signal: Enum
+    recommendation_signal: RecommendationSignal
     analysis_overview: str
     recommendation_confidence_score: float
-    analysis: str
+    reasoning: str

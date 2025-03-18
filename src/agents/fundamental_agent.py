@@ -1,20 +1,32 @@
 import json
-import os
 import sys
 import statistics
+from typing import Any, Dict, TypedDict
 from src.llm.models import get_model
+from langgraph.types import Command
+from langgraph.graph import StateGraph, START
+from utils.app_logger import setup_logger
+from utils.config import settings, get_sync_database
+
+logger = setup_logger("src/agents/fundamental_agent.py")
+db = get_sync_database()
 
 # Initialize Groq groq_client
 groq_client = get_model(model_provider="GROQ")
 model = "llama-3.3-70b-versatile"  # You can change this to your preferred model
 
+class FinancialAnalysisState(TypedDict):
+    fundamental_data: Dict[str, Any]  # Input financial data
+    operating_ratios: Dict[str, Any]  # Results from operating ratios analysis
+    profitability_ratios: Dict[str, Any]  # Results from profitability analysis
+    leverage_ratios: Dict[str, Any]  # Results from leverage analysis
+    stability_metrics: Dict[str, Any]  # Results from stability analysis
+    analysis_complete: bool  # Flag to indicate all analyses are complete
 
-def compute_operating_ratios(json_file):
+def compute_operating_ratios(fundamental_data):
     """Computes operating ratios, assigns scores, calculates confidence level, and classifies financial health."""
 
-    # Load JSON data
-    with open(json_file, "r") as file:
-        data = json.load(file)
+    data = fundamental_data
 
     # Extract balance sheet, profit/loss, and yearly data
     balance_sheet = data["balance_sheet"]["periods"]
@@ -101,13 +113,11 @@ def compute_operating_ratios(json_file):
 
     return operating_ratios
 
-def calculate_profitability_ratios(json_file):
+def calculate_profitability_ratios(fundamental_data):
     """
     Function to calculate profitability ratios, confidence level, and classify the company's financial health.
     """
-    # Load JSON data
-    with open(json_file, "r") as file:
-        data = json.load(file)
+    data = fundamental_data
         
     latest_period = "Mar'24"  # Extract the latest period data
     profit_loss = data["profit_loss"]["periods"][latest_period]
@@ -182,11 +192,9 @@ def calculate_profitability_ratios(json_file):
         "Signal": signal
     }
 
-def compute_leverage_ratios(json_file):
+def compute_leverage_ratios(fundamental_data):
     """Computes leverage ratios, assigns scores, calculates confidence level, and classifies financial health."""
-    # Load JSON data
-    with open(json_file, "r") as file:
-        data = json.load(file)
+    data = fundamental_data
         
     # Extract balance sheet, profit/loss, and yearly data
     balance_sheet = data["balance_sheet"]["periods"]
@@ -269,12 +277,10 @@ def compute_leverage_ratios(json_file):
     
     return leverage_ratios
 
-def compute_company_stability(json_file):
+def compute_company_stability(fundamental_data):
     """Computes company stability based on cash flow, sales, EBIT, debt, dividends, and promoter holding trends."""
 
-    # Load JSON data
-    with open(json_file, "r") as file:
-        data = json.load(file)
+    data = fundamental_data
 
     # Extract relevant data
     cash_flow = data["cash_flow"]["periods"]
@@ -312,10 +318,10 @@ def compute_company_stability(json_file):
     def score_metric(value, thresholds):
         """Assigns a score based on predefined thresholds."""
         if value <= thresholds[0]:
-            return 2  # ✅ Good/Stable
+            return 2 
         elif value <= thresholds[1]:
-            return 1  # ⚠ Moderate
-        return 0  # ❌ Risky/Concerning
+            return 1 
+        return 0 
 
     # **Scoring**
     scores = {
@@ -361,195 +367,147 @@ def compute_company_stability(json_file):
 
     return stability_results
 
-# Define system messages and tools
-def create_financial_analysis_agent(json_file_path=None):
+# Define node functions
+def analyze_operating_ratios(state: FinancialAnalysisState) -> dict:
+    """Node to compute operating ratios"""
+    result = compute_operating_ratios(state["fundamental_data"])
+    # Update state with the result
+    Command(update={"operating_ratios": result})
+    return {"operating_ratios": result}
+
+def analyze_profitability_ratios(state: FinancialAnalysisState) -> dict:
+    """Node to compute profitability ratios"""
+    result = calculate_profitability_ratios(state["fundamental_data"])
+    Command(update={"profitability_ratios": result})
+    return {"profitability_ratios": result}
+
+def analyze_leverage_ratios(state: FinancialAnalysisState) -> dict:
+    """Node to compute leverage ratios"""
+    result = compute_leverage_ratios(state["fundamental_data"])
+    Command(update={"leverage_ratios": result})
+    return {"leverage_ratios": result}
+
+def analyze_stability(state: FinancialAnalysisState) -> dict:
+    """Node to compute company stability metrics"""
+    result = compute_company_stability(state["fundamental_data"])
+    Command(update={"stability_metrics": result})
+    return {"stability_metrics": result}
+
+def mark_analysis_complete(state: FinancialAnalysisState) -> dict:
+    """Node to mark analysis as complete"""
+    Command(update={"analysis_complete": True})
+    return {"analysis_complete": True}
+
+# Create the financial analysis subgraph
+def create_financial_analysis_subgraph():
+    """Creates a subgraph for financial analysis"""
+    # Initialize the graph
+    builder = StateGraph(FinancialAnalysisState)
+    
+    # Add nodes
+    builder.add_node("analyze_operating_ratios", analyze_operating_ratios)
+    builder.add_node("analyze_profitability_ratios", analyze_profitability_ratios)
+    builder.add_node("analyze_leverage_ratios", analyze_leverage_ratios)
+    builder.add_node("analyze_stability", analyze_stability)
+    builder.add_node("mark_complete", mark_analysis_complete)
+    
+    # Add edges - create a sequential workflow
+    builder.add_edge(START, "analyze_operating_ratios")
+    builder.add_edge("analyze_operating_ratios", "analyze_profitability_ratios")
+    builder.add_edge("analyze_profitability_ratios", "analyze_leverage_ratios")
+    builder.add_edge("analyze_leverage_ratios", "analyze_stability")
+    builder.add_edge("analyze_stability", "mark_complete")
+    
+    # Compile the graph
+    return builder.compile()
+
+def run_financial_analysis(fundamental_data):
+    """Run the financial analysis subgraph with the provided data"""
+    # Create the subgraph
+    financial_analysis_graph = create_financial_analysis_subgraph()
+    
+    # Define initial state
+    initial_state = {
+        "fundamental_data": fundamental_data,
+        "operating_ratios": None,
+        "profitability_ratios": None,
+        "leverage_ratios": None,
+        "stability_metrics": None,
+        "analysis_complete": False
+    }
+    
+    final_state = financial_analysis_graph.invoke(initial_state)
+    
+    # Return the complete analysis results
+    return {
+        "operating_ratios": final_state["operating_ratios"],
+        "profitability_ratios": final_state["profitability_ratios"],
+        "leverage_ratios": final_state["leverage_ratios"],
+        "stability_metrics": final_state["stability_metrics"]
+    }
+
+def fundamental_agent(symbol: str):
     """
-    Creates and runs a financial analysis agent that uses various ratio analysis tools.
+    Creates a financial analysis agent using LangGraph subgraph
     
     Args:
-        json_file_path: Path to the financial data JSON file
+        symbol: Stock symbol to analyze
+    
+    Returns:
+        Analysis report from the LLM
     """
+    # Get fundamental data from database
+    fundamental_data = db.fundamental_data.find_one({"symbol": symbol})
     
-    # Ensure we have a file path
-    if not json_file_path:
-        print("Error: JSON file path is required")
-        return None
+    if not fundamental_data:
+        logger.error(f"No fundamental data found for symbol: {symbol}")
+        return f"No fundamental data found for symbol: {symbol}"
     
-    # Check if file exists
-    if not os.path.exists(json_file_path):
-        print(f"Error: File not found at {json_file_path}")
-        return None
-    
-    # Define tools
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "compute_operating_ratios",
-                "description": "Calculate operating ratios like Fixed Asset Turnover, Working Capital Turnover, Total Asset Turnover, and Inventory Turnover. Returns the values, confidence level, and investment signal.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "json_file": {
-                            "type": "string",
-                            "description": "Path to the JSON file containing financial data",
-                        }
-                    },
-                    "required": ["json_file"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "calculate_profitability_ratios",
-                "description": "Calculate profitability ratios like EBITDA Margin, PAT Margin, ROE, ROCE, and ROA. Returns the values, confidence level, and investment signal.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "json_file": {
-                            "type": "string",
-                            "description": "Path to the JSON file containing financial data",
-                        }
-                    },
-                    "required": ["json_file"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "compute_leverage_ratios",
-                "description": "Calculate leverage ratios like Interest Coverage Ratio, Debt-to-Equity Ratio, Debt-to-Asset Ratio, and Financial Leverage Ratio. Returns the values, confidence level, and investment signal.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "json_file": {
-                            "type": "string",
-                            "description": "Path to the JSON file containing financial data",
-                        }
-                    },
-                    "required": ["json_file"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "compute_company_stability",
-                "description": "Compute company stability based on cash flow, sales, EBIT, debt, dividends, and promoter holding trends. Returns a JSON string with metrics, scores, confidence level, and investment signal.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "json_file": {
-                            "type": "string",
-                            "description": "Path to the JSON file containing financial data",
-                        }
-                    },
-                    "required": ["json_file"],
-                },
-            },
-        }
-    ]
-    
-    # Map functions to their implementations
-    available_functions = {
-        "compute_operating_ratios": compute_operating_ratios,
-        "calculate_profitability_ratios": calculate_profitability_ratios,
-        "compute_leverage_ratios": compute_leverage_ratios,
-        "compute_company_stability": compute_company_stability
-    }
+    # Run the financial analysis subgraph
+    analysis_results = run_financial_analysis(fundamental_data)
     
     # Initial messages
     messages = [
         {
             "role": "system", 
             "content": """You are a sophisticated financial analyst specializing in fundamental analysis of companies. 
-            Your task is to analyze financial data using operating ratios, profitability ratios, leverage ratios, and company stability metrics.
-            Based on the analysis, you should provide an overall investment recommendation.
+            Your task is to analyze financial data comprehensively and provide an investment recommendation.
             
-            You have access to tools that can calculate various financial ratios and stability metrics from JSON financial data.
-            You should use these tools to perform a comprehensive analysis, and then provide a detailed report
-            with your findings and recommendations. Use all available tools to get a complete picture.
+            The data provided includes key financial metrics organized into four categories:
+            1. Operating Ratios - showing how efficiently the company utilizes its assets
+            2. Profitability Ratios - indicating the company's ability to generate profits
+            3. Leverage Ratios - revealing the company's debt structure and risk
+            4. Stability Metrics - demonstrating the consistency of the company's performance
             
-            Explain the significance of each ratio and metric and what it indicates about the company's financial health and stability.
+            For each category, you'll receive calculated ratios, confidence levels, and signals.
+            
+            Explain the significance of each ratio and metric and what it indicates about the company's financial health.
+            Evaluate the strengths and weaknesses revealed by these metrics.
             Conclude with an overall investment recommendation (Bullish/Buy, Neutral/Hold, or Bearish/Sell) based on
-            your comprehensive analysis of all ratio categories and stability factors."""
+            your comprehensive analysis of all categories."""
         },
         {
             "role": "user", 
-            "content": f"Please analyze the financial data in the file {json_file_path} and provide a comprehensive fundamental analysis with an investment recommendation and all the relevant numbers."
+            "content": f"Please analyze the financial data for {symbol} and provide a comprehensive fundamental analysis with an investment recommendation based on the following metrics:\n\n{json.dumps(analysis_results, indent=2)}"
         }
     ]
     
-    # Make the initial request
+    # Make the request to the LLM
     try:
         response = groq_client.chat.completions.create(
             model=model, 
-            messages=messages, 
-            tools=tools, 
-            tool_choice="auto", 
-            max_completion_tokens=8192
+            messages=messages,
+            temperature=0.6
         )
         
-        response_message = response.choices[0].message
-        messages.append(response_message)
-        
-        # Process tool calls if any
-        if hasattr(response_message, 'tool_calls') and response_message.tool_calls:
-            tool_calls = response_message.tool_calls
-            
-            for tool_call in tool_calls:
-                function_name = tool_call.function.name
-                print(f"Function Call: {function_name}")
-                function_to_call = available_functions[function_name]
-                function_args = json.loads(tool_call.function.arguments)
-                
-                try:
-                    function_response = function_to_call(**function_args)
-                    print(f"Function Response: {function_response}")
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "content": json.dumps(function_response),
-                            "tool_call_id": tool_call.id,
-                        }
-                    )
-                except Exception as e:
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "content": f"Error: {str(e)}",
-                            "tool_call_id": tool_call.id,
-                        }
-                    )
-            
-            # Make the final request with tool call results
-            final_response = groq_client.chat.completions.create(
-                model=model, 
-                messages=messages, 
-                tools=tools, 
-                tool_choice="auto", 
-                max_completion_tokens=8192
-            )
-            
-            return final_response.choices[0].message.content
-        else:
-            # If no tool calls were made
-            return response_message.content
+        return response.choices[0].message.content
             
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return f"An error occurred: {str(e)}"
+        logger.error(f"Error in fundamental_agent: {str(e)}")
+        return f"An error occurred during financial analysis: {str(e)}"
 
-# Example usage
 if __name__ == "__main__":
-    # Check if file path is provided as command line argument
-    if len(sys.argv) > 1:
-        json_file_path = sys.argv[1]
-    else:
-        json_file_path = "example.json"  # Default file name
-    
-    analysis_result = create_financial_analysis_agent(json_file_path)
-    print("\n=== FINANCIAL ANALYSIS REPORT ===\n")
-    print(analysis_result)
+    # Example usage
+    symbol = "RELIANCE"
+    analysis_report = fundamental_agent(symbol)
+    print(analysis_report)
