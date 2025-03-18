@@ -14,7 +14,6 @@ class APIKeyManager:
         self.last_request_time = {key: datetime.now() for key in api_keys}
         self.rate_limit = rate_limit
         self.cooldown_period = cooldown_period
-        self.model_name = model_name
 
     def get_next_available_key(self) -> str:
         start_index = self.current_key_index
@@ -32,7 +31,7 @@ class APIKeyManager:
                 
             if self.request_counts[current_key] < self.rate_limit:
                 # Key is available
-                return current_key
+                return current_key, self.current_key_index
             
             # Move to next key
             self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
@@ -42,8 +41,8 @@ class APIKeyManager:
                 sleep(10)
                 
     def use_and_get_key(self):
-        key = self.get_next_available_key()
+        key, index = self.get_next_available_key()
         self.request_counts[key] += 1
-        logger.info(f"Using key {key} for model {self.model_name}")
+        logger.info(f"Using key {index}")
         self.last_request_time[key] = datetime.now()
         return key

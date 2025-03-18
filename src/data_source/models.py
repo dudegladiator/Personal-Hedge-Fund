@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel
 import pytz
@@ -31,4 +32,8 @@ class GrowwStockDetails(BaseModel):
     # Metadata
     updated_at: datetime = datetime.now(pytz.UTC)
 
-
+class SentimentAgent(BaseModel):
+    recommendation_signal: Enum
+    analysis_overview: str
+    recommendation_confidence_score: float
+    analysis: str

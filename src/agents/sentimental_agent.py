@@ -1,23 +1,13 @@
-import pymongo
 import json
-import os
-from datetime import datetime
-from groq import Groq
 import re
-import json
-   
-# MongoDB connection setup
-mongo_uri = "mongodb+srv://begoodop422:unsxxP73YNApLT7Z@cluster0.snkv0qw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-client = pymongo.MongoClient(mongo_uri)
-db = client["hedge_fund_manager"]
-collection = db["corporate_announcements_news"]
-
-# Initialize the Groq client
-GROQ_API_KEY = "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"
-groq_client = Groq(api_key=GROQ_API_KEY)
-
-# Helper function to get the latest announcement entries
+from utils.config import settings, get_sync_database
+from utils.app_logger import setup_logger
+from src.llm.models import get_model
 from datetime import datetime, timedelta
+
+logger = setup_logger("src/agents/sentimental_agent.py")
+db = get_sync_database()
+groq_client = get_model(model_provider="GROQ")
 
 def get_latest_announcements(entries, date_field, days=90, date_format="%d-%m-%Y"):
     """
@@ -58,10 +48,7 @@ def get_latest_announcements(entries, date_field, days=90, date_format="%d-%m-%Y
         print(f"Date parsing error: {e}")
         return []
 
-# Helper function to get the latest news entries
-from datetime import datetime, timedelta
-
-def get_latest_news(news_list, days=5):
+def get_latest_news(news_list, days):
     """
     Retrieves all news items from the last specified number of days, sorted by date (newest first).
 
@@ -110,19 +97,19 @@ def parse_llm_response(response_content):
             if "recommendation_sign" in result and "analysis_overview" in result and "recommendation_confidence_score" in result:
                 return result
             else:
-                return {"recommendation": "NA", "details": "LLM response missing required fields."}
+                return {"recommendation_sign": "NEUTRAL", "details": "LLM response missing required fields."}
         except json.JSONDecodeError:
-            return {"recommendation": "NA", "details": "Failed to parse extracted JSON from response."}
+            return {"recommendation_sign": "NEUTRAL", "details": "Failed to parse extracted JSON from response."}
     else:
-        return {"recommendation": "NA", "details": "No valid JSON object found in LLM response."}
+        return {"recommendation_sign": "NEUTRAL", "details": "No valid JSON object found in LLM response."}
  
 # Function 1: Analyze latest announcements using Groq
-def get_recommendation_from_announcements(symbol, exchange):
+def get_recommendation_from_announcements(symbol, exchange, past_days=90):
     try:
         # Fetch data from MongoDB (unchanged)
-        data = collection.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
+        data = db.corporate_announcements_news.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
         if not data:
-            return {"recommendation": "NA", "details": "No data found for the given symbol and exchange in the database."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database."}
         
         # Extract announcement categories (unchanged)
         announcements = data.get("announcements", {})
@@ -132,14 +119,14 @@ def get_recommendation_from_announcements(symbol, exchange):
         bonus = announcements.get("bonus", [])
         rights = announcements.get("rights", [])
         
-        board_meetings_latest = get_latest_announcements(board_meetings, "date")
-        dividends_latest = get_latest_announcements(dividends, "ex_date")
-        splits_latest = get_latest_announcements(splits, "ex_date")
-        bonus_latest = get_latest_announcements(bonus, "ex_date")
-        rights_latest = get_latest_announcements(rights, "ex_date")
+        board_meetings_latest = get_latest_announcements(board_meetings, "date", days=past_days)
+        dividends_latest = get_latest_announcements(dividends, "ex_date", days=past_days)
+        splits_latest = get_latest_announcements(splits, "ex_date", days=past_days)
+        bonus_latest = get_latest_announcements(bonus, "ex_date", days=past_days)
+        rights_latest = get_latest_announcements(rights, "ex_date", days=past_days)
         
         if not any([board_meetings_latest, dividends_latest, splits_latest, bonus_latest, rights_latest]):
-            return {"recommendation": "NA", "details": "No recent announcement data available for analysis."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No recent announcement data available for analysis."}
         
         # Format data (unchanged)
         data_str = (
@@ -151,19 +138,76 @@ def get_recommendation_from_announcements(symbol, exchange):
         )
         
         # Updated prompt
-        system_content = "You are a financial analyst API. Your task is to analyze corporate announcements and return a stock recommendation in JSON format."
+        system_content = """You are a financial analyst API specializing in corporate announcement analysis. Your task is to analyze corporate announcements and return a stock recommendation in JSON format.
+
+RECOMMENDATION GUIDELINES:
+1. BULLISH (Strong Buy/Buy):
+   - Clear positive catalysts present
+   - Strong fundamental improvements
+   - Significant corporate actions benefiting shareholders
+
+2. NEUTRAL (Hold):
+   - Mixed or unclear signals
+   - Balanced positive and negative factors
+   - Insufficient data for strong conviction
+
+3. BEARISH (Sell/Strong Sell):
+   - Negative catalysts present
+   - Fundamental deterioration
+   - Corporate actions potentially harming shareholder value
+
+CONFIDENCE SCORE DEFINITIONS:
+0.0-0.2: Very Low Confidence
+- Minimal data available
+- Highly uncertain outcomes
+- Conflicting signals
+
+0.21-0.4: Low Confidence
+- Limited data available
+- Uncertain market conditions
+- Weak correlation between events and potential outcomes
+
+0.41-0.6: Moderate Confidence
+- Adequate data available
+- Some clear signals present
+- Mixed but interpretable indicators
+
+0.61-0.8: High Confidence
+- Strong data support
+- Clear market signals
+- Consistent pattern recognition
+
+0.81-1.0: Very High Confidence
+- Extensive data support
+- Multiple confirming signals
+- Strong historical correlation
+
+CORPORATE ANNOUNCEMENT WEIGHT FACTORS:
+- Board Meetings: Impact on strategic decisions
+- Dividends: Direct shareholder returns
+- Stock Splits: Market accessibility
+- Bonus Issues: Capital structure changes
+- Rights Issues: Funding and dilution impact"""
+
         user_content = (
             f"Analyze the following latest announcements for {symbol} on {exchange}. "
             f"Based on the data, provide a stock recommendation_sign: 'BULLISH', 'BEARISH', or 'NEUTRAL'. "
-            f"Thoroughly analyse the given info in order to make decision for recommendation_sign and recommendation_confidence_score. "
-            f"Provide a brief overview of your analysis. "
-            f"Provide a confidence score for your recommendation_sign. Must be between 0 and 1. "
+            f"Follow the confidence score guidelines strictly when assigning recommendation_confidence_score. "
+            f"Consider the weight factors for different types of announcements. "
             f"\n\nData:\n{data_str}\n\n"
             f"**Critical Instructions:**\n"
-            f"- Return **only** a JSON object with three keys: 'recommendation_sign', 'recommendation_confidence_score', and 'analysis_overview.\n"
-            f"- Do not include any additional text, explanations, or code outside the JSON object.\n"
-            f"- Ensure the JSON is valid and can be parsed directly.\n"
-            f"- Example: {{ \"analysis_overview\": \"Strong earnings reported.\", \"recommendation_sign\": \"BUY\",\"recommendation_confidence_score\": 0.85}}\n"
+            f"1. Analyze each announcement type's impact separately first\n"
+            f"2. Consider the recency and significance of each announcement\n"
+            f"3. Provide clear reasoning for the confidence score\n"
+            f"4. Return a JSON object with exactly these keys:\n"
+            f"   - recommendation_sign: 'BULLISH', 'BEARISH', or 'NEUTRAL'\n"
+            f"   - recommendation_confidence_score: float between 0-1\n"
+            f"   - analysis_overview: detailed analysis summary\n"
+            f"Example: {{\n"
+            f"  \"recommendation_sign\": \"BULLISH\",\n"
+            f"  \"recommendation_confidence_score\": 0.85,\n"
+            f"  \"analysis_overview\": \"Strong dividend announcement with clear growth signals\"\n"
+            f"}}"
         )
         
         # Call Groq API (unchanged)
@@ -192,41 +236,98 @@ def get_recommendation_from_announcements(symbol, exchange):
         return result
     
     except Exception as e:
-        return {"recommendation": "NA", "details": f"An error occurred: {str(e)}"}
+        return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
 # Function 2: Analyze latest news using Groq
-def get_recommendation_from_news(symbol, exchange):
+def get_recommendation_from_news(symbol, exchange, past_days=5):
     try:
         # Fetch data from MongoDB (unchanged)
-        data = collection.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
+        data = db.corporate_announcements_news.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
         if not data:
-            return {"recommendation": "NA", "details": "No data found for the given symbol and exchange in the database."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database."}
         
         # Extract and sort news (unchanged)
         news = data.get("news", [])
-        news_latest = get_latest_news(news)
+        news_latest = get_latest_news(news, days = past_days)
         
         if not news_latest:
-            return {"recommendation": "NA", "details": "No recent news data available for analysis."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No recent news data available for analysis."}
         
         # Format data (unchanged)
         data_str = f"Latest News:\n{json.dumps(news_latest, indent=2)}"
-
-        print(data_str)
         
         # Updated prompt
-        system_content = "You are a financial analyst API. Your task is to analyze news data and return a stock recommendation in JSON format."
+        system_content = """You are a financial analyst API specializing in news sentiment analysis. Your task is to analyze financial news and return a stock recommendation in JSON format.
+
+RECOMMENDATION GUIDELINES:
+1. BULLISH (Strong Buy/Buy):
+   - Positive news catalysts
+   - Strong business performance
+   - Favorable market conditions
+
+2. NEUTRAL (Hold):
+   - Mixed news sentiment
+   - Unclear market direction
+   - Balanced positive/negative coverage
+
+3. BEARISH (Sell/Strong Sell):
+   - Negative news catalysts
+   - Business challenges
+   - Unfavorable market conditions
+
+CONFIDENCE SCORE DEFINITIONS:
+0.0-0.2: Very Low Confidence
+- Limited news coverage
+- Unverified sources
+- Conflicting reports
+
+0.21-0.4: Low Confidence
+- Sparse news coverage
+- Some unreliable sources
+- Unclear impact on stock
+
+0.41-0.6: Moderate Confidence
+- Regular news coverage
+- Mix of reliable sources
+- Measurable market impact
+
+0.61-0.8: High Confidence
+- Substantial news coverage
+- Mostly reliable sources
+- Clear market impact
+
+0.81-1.0: Very High Confidence
+- Extensive news coverage
+- Highly reliable sources
+- Significant market impact
+
+NEWS ANALYSIS WEIGHT FACTORS:
+- Source Credibility: Reliability of news source
+- News Recency: Timing relevance
+- Market Impact: Direct effect on stock price
+- Volume: Amount of coverage
+- Consistency: Agreement across sources"""
+
         user_content = (
-            f"Analyze the following latest news data for {symbol} on {exchange}. "
+            f"Analyze the following latest news for {symbol} on {exchange}. "
             f"Based on the news, provide a stock recommendation_sign: 'BULLISH', 'BEARISH', or 'NEUTRAL'. "
-            f"Thoroughly analyse the given info in order to make decision for recommendation_sign and recommendation_confidence_score. "
-            f"Provide a confidence score for your recommendation_sign. Must be between 0 and 1. "
+            f"Follow the confidence score guidelines strictly when assigning recommendation_confidence_score. "
+            f"Consider the weight factors for different news aspects. "
             f"\n\nData:\n{data_str}\n\n"
             f"**Critical Instructions:**\n"
-            f"- Return **only** a JSON object with three keys: 'recommendation_sign', 'recommendation_confidence_score' and 'analysis_overview.\n"
-            f"- Do not include any additional text, explanations, or code outside the JSON object.\n"
-            f"- Ensure the JSON is valid and can be parsed directly.\n"
-            f"- Example: {{ \"analysis_overview\": \"Strong earnings reported.\", \"recommendation_sign\": \"BUY\",\"recommendation_confidence_score\": 0.85}}\n"        )
+            f"1. Evaluate news credibility and impact\n"
+            f"2. Consider news recency and relevance\n"
+            f"3. Assess market sentiment across multiple sources\n"
+            f"4. Return a JSON object with exactly these keys:\n"
+            f"   - recommendation_sign: 'BULLISH', 'BEARISH', or 'NEUTRAL'\n"
+            f"   - recommendation_confidence_score: float between 0-1\n"
+            f"   - analysis_overview: detailed analysis summary\n"
+            f"Example: {{\n"
+            f"  \"recommendation_sign\": \"BULLISH\",\n"
+            f"  \"recommendation_confidence_score\": 0.85,\n"
+            f"  \"analysis_overview\": \"Strong positive news coverage with consistent market impact\"\n"
+            f"}}"
+        )
         
         # Call Groq API (unchanged)
         completion = groq_client.chat.completions.create(
@@ -254,7 +355,7 @@ def get_recommendation_from_news(symbol, exchange):
         return result
     
     except Exception as e:
-        return {"recommendation": "NA", "details": f"An error occurred: {str(e)}"}
+        return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
 # Example usage
 if __name__ == "__main__":
@@ -264,6 +365,6 @@ if __name__ == "__main__":
     print(json.dumps(result1, indent=2))
     
     # Test the news function
-    result2 = get_recommendation_from_news("526961", "NSE")
+    result2 = get_recommendation_from_news("526961", "NSE", 200)
     print("\nRecommendation from News:")
     print(json.dumps(result2, indent=2))
