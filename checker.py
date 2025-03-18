@@ -1,4 +1,5 @@
 from openai import OpenAI
+from talib import SMA, RSI, MACD, BBANDS
 
 client = OpenAI(
   api_key="AIzaSyC5TSKNvjbhUfJuI_Q5GT3qxrLylxZMTKI",

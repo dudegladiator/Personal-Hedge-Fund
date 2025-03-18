@@ -483,26 +483,43 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
 your_strategy_code = """
 import pandas as pd
 import numpy as np
-import talib as ta
+from talib import SMA, RSI, MACD, BBANDS
 
-def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
-    signals = pd.DataFrame(index=data.index)
-    signals['Signal'] = 0  # Initialize with no position
-    
-    # Ensure 1D array for TA-Lib
-    close_prices = data['Close'].values
-    if close_prices.ndim > 1:
-        close_prices = close_prices.flatten()
-    
-    # Calculate moving averages
-    data['SMA_20'] = ta.SMA(close_prices, timeperiod=20)
-    data['SMA_50'] = ta.SMA(close_prices, timeperiod=50)
-    
-    # Generate signals: 1 for buy, -1 for sell
-    signals['Signal'] = np.where(data['SMA_20'] > data['SMA_50'], 1, 0)
-    signals['Position'] = signals['Signal'].diff()
-    
-    return signals
+def generate_signals(data):
+    # Ensure input data is a pandas DataFrame
+    if not isinstance(data, pd.DataFrame):
+        raise ValueError("Input data must be a pandas DataFrame")
+
+    # Check for required columns
+    required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+    if not all(col in data.columns for col in required_columns):
+        raise ValueError("Input DataFrame must contain 'Open', 'High', 'Low', 'Close', and 'Volume' columns")
+
+    # Calculate Simple Moving Average (SMA) with a 50-day window
+    data['SMA_50'] = SMA(data['Close'].values, timeperiod=50)
+
+    # Calculate Relative Strength Index (RSI) with a 14-day window
+    data['RSI'] = RSI(data['Close'].values, timeperiod=14)
+
+    # Calculate Moving Average Convergence Divergence (MACD) with 12 and 26-day windows
+    macd, macd_signal, macd_hist = MACD(data['Close'].values, fastperiod=12, slowperiod=26, signalperiod=9)
+    data['MACD'] = macd
+    data['MACD_Signal'] = macd_signal
+
+    # Calculate Bollinger Bands with a 20-day window and 2 standard deviations
+    upper, middle, lower = BBANDS(data['Close'].values, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+    data['BB_Upper'] = upper
+    data['BB_Middle'] = middle
+    data['BB_Lower'] = lower
+
+    # Generate trading signals based on a logical combination of indicators
+    data['Signal'] = 0  # Initialize signal column with hold (0)
+    data.loc[(data['Close'] > data['BB_Upper']) & (data['RSI'] > 70), 'Signal'] = -1  # Sell when price exceeds upper BB and RSI is overbought
+    data.loc[(data['Close'] < data['BB_Lower']) & (data['RSI'] < 30), 'Signal'] = 1  # Buy when price falls below lower BB and RSI is oversold
+    data.loc[(data['MACD'] > data['MACD_Signal']) & (data['MACD'] > 0), 'Signal'] = 1  # Buy when MACD crosses above signal line and is positive
+    data.loc[(data['MACD'] < data['MACD_Signal']) & (data['MACD'] < 0), 'Signal'] = -1  # Sell when MACD crosses below signal line and is negative
+
+    return data
 """
 
 your_strategy_code1 = """
@@ -623,7 +640,7 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     
 params = BacktestParameters(
     symbol="RELIANCE",
-    strategy_code=your_strategy_code2,  # LLM generated code as string
+    strategy_code=your_strategy_code,  # LLM generated code as string
     start_date=datetime(2022, 1, 1),
     end_date=datetime(2023, 12, 31),
     initial_capital=100000,
