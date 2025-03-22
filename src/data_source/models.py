@@ -37,7 +37,7 @@ class RecommendationSignal(Enum):
     NEUTRAL = "NEUTRAL"
     BEARISH = "BEARISH"
 
-class SentimentAgent(BaseModel):
+class AgentResponse(BaseModel):
     recommendation_signal: RecommendationSignal
     analysis_overview: str
     recommendation_confidence_score: float

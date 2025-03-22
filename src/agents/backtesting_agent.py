@@ -3,6 +3,7 @@ import os
 import ast
 from dotenv import load_dotenv
 from groq import Groq
+from utils.util import safe_get
 
 load_dotenv()
 
@@ -31,16 +32,6 @@ def format_data_for_llm(data):
     announcements = data["company_announcements"]
     fundamentals = data["fundamental_data"]
     groww_details = data["groww_stock_details"]
-
-    # Helper function to handle missing data gracefully
-    def safe_get(data_dict, keys, default="N/A"):
-        """Safely retrieves nested values from a dictionary, returning a default if not found."""
-        try:
-            for key in keys:
-                data_dict = data_dict[key]
-            return data_dict
-        except (KeyError, TypeError):
-            return default
 
     # Build the prompt string.  Use triple quotes for multiline strings.
     prompt = f"""

@@ -18,3 +18,12 @@ def indian_stock_market_open() -> bool:
     current_time_ist = current_time.time()
     
     return market_start <= current_time_ist <= market_end
+
+def safe_get(data_dict, keys, default="N/A"):
+        """Safely retrieves nested values from a dictionary, returning a default if not found."""
+        try:
+            for key in keys:
+                data_dict = data_dict[key]
+            return data_dict
+        except (KeyError, TypeError):
+            return default

@@ -3,13 +3,14 @@ import importlib
 import tempfile
 from pydantic import BaseModel, Field, field_validator
 from typing import Dict, List, Optional, Tuple, Union
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import talib as ta
+
 from enum import Enum
 import yfinance as yf
-from requests_ratelimiter import LimiterSession, RequestRate, Limiter, Duration
+from src.backtesting.data_loader import DataLoader
 
 class PositionType(str, Enum):
     LONG = "LONG"
@@ -107,37 +108,6 @@ class BacktestResult(BaseModel):
     equity_curve: List[float]
     monthly_returns: Dict[str, float]
     yearly_returns: Dict[str, float]
-
-class DataLoader:
-    def __init__(self):
-        history_rate = RequestRate(1, Duration.SECOND)
-        limiter = Limiter(history_rate)
-        self.session = LimiterSession(limiter=limiter)
-        self.session.headers['User-agent'] = 'tickerpicker/1.0'
-
-    def load_data(self, params: BacktestParameters) -> pd.DataFrame:
-        """Load historical data for backtesting"""
-        try:
-            # Format ticker based on exchange
-            ticker = f"{params.symbol}.NS" if params.symbol.isalpha() else params.symbol
-            
-            # Download data
-            data = yf.download(
-                ticker,
-                start=params.start_date,
-                end=params.end_date,
-                interval=params.timeframe.value,
-                progress=False,
-                session=self.session
-            )
-            
-            if data.empty or len(data) < 2:
-                raise ValueError(f"Insufficient data for {params.symbol}")
-            
-            return data
-            
-        except Exception as e:
-            raise Exception(f"Error loading data for {params.symbol}: {str(e)}")
 
 
 def process_strategy_code(strategy_code: str) -> callable:
@@ -454,7 +424,7 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         data_loader = DataLoader()
         
         # Load historical data
-        data = data_loader.load_data(params)
+        data = data_loader.load_data(symbol=params.symbol, start_date=params.start_date, end_date=params.end_date, timeframe=params.timeframe.value)
         
         # Process strategy code
         strategy = process_strategy_code(params.strategy_code)
@@ -478,49 +448,6 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
     except Exception as e:
         raise Exception(f"Backtesting failed: {str(e)}")
     
-    
-# generate_signals    
-your_strategy_code = """
-import pandas as pd
-import numpy as np
-from talib import SMA, RSI, MACD, BBANDS
-
-def generate_signals(data):
-    # Ensure input data is a pandas DataFrame
-    if not isinstance(data, pd.DataFrame):
-        raise ValueError("Input data must be a pandas DataFrame")
-
-    # Check for required columns
-    required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-    if not all(col in data.columns for col in required_columns):
-        raise ValueError("Input DataFrame must contain 'Open', 'High', 'Low', 'Close', and 'Volume' columns")
-
-    # Calculate Simple Moving Average (SMA) with a 50-day window
-    data['SMA_50'] = SMA(data['Close'].values, timeperiod=50)
-
-    # Calculate Relative Strength Index (RSI) with a 14-day window
-    data['RSI'] = RSI(data['Close'].values, timeperiod=14)
-
-    # Calculate Moving Average Convergence Divergence (MACD) with 12 and 26-day windows
-    macd, macd_signal, macd_hist = MACD(data['Close'].values, fastperiod=12, slowperiod=26, signalperiod=9)
-    data['MACD'] = macd
-    data['MACD_Signal'] = macd_signal
-
-    # Calculate Bollinger Bands with a 20-day window and 2 standard deviations
-    upper, middle, lower = BBANDS(data['Close'].values, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
-    data['BB_Upper'] = upper
-    data['BB_Middle'] = middle
-    data['BB_Lower'] = lower
-
-    # Generate trading signals based on a logical combination of indicators
-    data['Signal'] = 0  # Initialize signal column with hold (0)
-    data.loc[(data['Close'] > data['BB_Upper']) & (data['RSI'] > 70), 'Signal'] = -1  # Sell when price exceeds upper BB and RSI is overbought
-    data.loc[(data['Close'] < data['BB_Lower']) & (data['RSI'] < 30), 'Signal'] = 1  # Buy when price falls below lower BB and RSI is oversold
-    data.loc[(data['MACD'] > data['MACD_Signal']) & (data['MACD'] > 0), 'Signal'] = 1  # Buy when MACD crosses above signal line and is positive
-    data.loc[(data['MACD'] < data['MACD_Signal']) & (data['MACD'] < 0), 'Signal'] = -1  # Sell when MACD crosses below signal line and is negative
-
-    return data
-"""
 
 your_strategy_code1 = """
 import pandas as pd
@@ -532,9 +459,7 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     signals['Signal'] = 0
     
     # Ensure 1D array for TA-Lib
-    close_prices = data['Close'].values
-    if close_prices.ndim > 1:
-        close_prices = close_prices.flatten()
+    close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
     
     # Calculate RSI
     data['RSI'] = ta.RSI(close_prices, timeperiod=14)
@@ -557,7 +482,7 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     signals['Signal'] = 0
     
     # Ensure we're working with single column Series
-    close_prices = data['Close'].values if isinstance(data['Close'], pd.Series) else data['Close'].iloc[:, 0].values
+    close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
     
     # Calculate Bollinger Bands
     upper, middle, lower = ta.BBANDS(
@@ -593,9 +518,9 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     signals['Signal'] = 0
     
     # Ensure we're working with single column Series
-    close_prices = data['Close'].values if isinstance(data['Close'], pd.Series) else data['Close'].iloc[:, 0].values
-    high_prices = data['High'].values if isinstance(data['High'], pd.Series) else data['High'].iloc[:, 0].values
-    low_prices = data['Low'].values if isinstance(data['Low'], pd.Series) else data['Low'].iloc[:, 0].values
+    close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
+    high_prices = data['High'].iloc[:, 0].values.astype(np.float64)
+    low_prices = data['Low'].iloc[:, 0].values.astype(np.float64)
     
     # Calculate indicators
     sma_200 = ta.SMA(close_prices, timeperiod=200)
@@ -640,7 +565,7 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     
 params = BacktestParameters(
     symbol="RELIANCE",
-    strategy_code=your_strategy_code,  # LLM generated code as string
+    strategy_code=your_strategy_code1,  # LLM generated code as string
     start_date=datetime(2022, 1, 1),
     end_date=datetime(2023, 12, 31),
     initial_capital=100000,
