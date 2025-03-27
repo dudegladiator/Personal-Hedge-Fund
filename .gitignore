@@ -170,3 +170,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 ta-lib-0.6.4
+.qodo
