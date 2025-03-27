@@ -12,16 +12,14 @@ class Settings(BaseSettings):
     MONGODB_URI: Optional[str] = os.getenv("MONGODB_URI")
     MONGODB_NAME: Optional[str] = os.getenv("MONGODB_NAME")
     
-    # REDIS_URI: Optional[str] = os.getenv("REDIS_URI")
-    
     GROQ_API_KEY1: Optional[str] = os.getenv("GROQ_API_KEY1")
     GROQ_API_KEY2: Optional[str] = os.getenv("GROQ_API_KEY2")
     
     GOOGLE_API_KEY1: Optional[str] = os.getenv("GOOGLE_API_KEY1")
     GOOGLE_API_KEY2: Optional[str] = os.getenv("GOOGLE_API_KEY2")
-    
-    class Config:
-        env_file = ".env"
+    GOOGLE_API_KEY3: Optional[str] = os.getenv("GOOGLE_API_KEY3")
+    GOOGLE_API_KEY4: Optional[str] = os.getenv("GOOGLE_API_KEY4")
+    GOOGLE_API_KEY5: Optional[str] = os.getenv("GOOGLE_API_KEY5")
 
 settings = Settings()
 

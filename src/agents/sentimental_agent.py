@@ -5,10 +5,13 @@ from utils.app_logger import setup_logger
 from src.llm.models import get_model
 from datetime import datetime, timedelta
 from src.prompts import announcements_system_prompt, news_system_prompt
+from utils.llm import parse_llm_response
 
 logger = setup_logger("src/agents/sentimental_agent.py")
 db = get_sync_database()
-groq_client = get_model(model_provider="GROQ")
+MODEL_PROVIDER = "GEMINI"
+MODEL_NAME = "gemini-2.0-flash"
+Format = "json_object" # json_object # text
 
 def get_latest_announcements(entries, date_field, days=90, date_format="%d-%m-%Y"):
     """
@@ -85,47 +88,9 @@ def get_latest_news(news_list, days):
     except ValueError as e:
         print(f"Date parsing error in news: {e}")
         return []
-
-def parse_llm_response(response_content):
-    # Extract thinking/reasoning part
-    thinking_pattern = r'<think>(.*?)</think>'
-    thinking_match = re.search(thinking_pattern, response_content, re.DOTALL)
-    reasoning = thinking_match.group(1).strip() if thinking_match else ""
-
-    # Extract JSON part
-    json_pattern = r'```json\s*(\{.*?\})\s*```'
-    json_match = re.search(json_pattern, response_content, re.DOTALL)
-    
-    if json_match:
-        json_str = json_match.group(1)
-        try:
-            result = json.loads(json_str)
-            # Verify required keys are present
-            if "recommendation_sign" in result and "analysis_overview" in result and "recommendation_confidence_score" in result:
-                # Add reasoning to the result
-                result["reasoning"] = reasoning
-                return result
-            else:
-                return {
-                    "recommendation_sign": "NEUTRAL", 
-                    "details": "LLM response missing required fields.",
-                    "reasoning": reasoning
-                }
-        except json.JSONDecodeError:
-            return {
-                "recommendation_sign": "NEUTRAL", 
-                "details": "Failed to parse extracted JSON from response.",
-                "reasoning": reasoning
-            }
-    else:
-        return {
-            "recommendation_sign": "NEUTRAL", 
-            "details": "No valid JSON object found in LLM response.",
-            "reasoning": reasoning
-        }
  
 # Function 1: Analyze latest announcements using Groq
-def get_recommendation_from_announcements(symbol, exchange, past_days=90):
+def get_recommendation_from_announcements(symbol, exchange="NSE", past_days=90):
     try:
         # Fetch data from MongoDB (unchanged)
         data = db.corporate_announcements_news.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
@@ -179,23 +144,21 @@ def get_recommendation_from_announcements(symbol, exchange, past_days=90):
             f"}}"
         )
         
-        # Call Groq API (unchanged)
-        completion = groq_client.chat.completions.create(
-            model="deepseek-r1-distill-llama-70b",
+        chat_model = get_model(model_provider=MODEL_PROVIDER)
+        completion = chat_model.chat.completions.create(
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": announcements_system_prompt},
                 {"role": "user", "content": user_content}
             ],
             temperature=0.05,
-            max_tokens=8000,
-            top_p=0.9,
-            response_format={ "type": "json_object" }
+            response_format={ "type": Format }
         )
         
         # Get response and parse with new logic
+        print(completion)
         response_content = completion.choices[0].message.content
         result = parse_llm_response(response_content)
-        # Add datetime of the run
         result["run_datetime"] = datetime.now().isoformat()
         return result
     
@@ -203,7 +166,7 @@ def get_recommendation_from_announcements(symbol, exchange, past_days=90):
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
 # Function 2: Analyze latest news using Groq
-def get_recommendation_from_news(symbol, exchange, past_days=5):
+def get_recommendation_from_news(symbol, exchange="NSE", past_days=5):
     try:
         # Fetch data from MongoDB (unchanged)
         data = db.corporate_announcements_news.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
@@ -241,16 +204,15 @@ def get_recommendation_from_news(symbol, exchange, past_days=5):
             f"}}"
         )
         
-        # Call Groq API (unchanged)
-        completion = groq_client.chat.completions.create(
-            model="deepseek-r1-distill-llama-70b",
+        chat_model = get_model(model_provider=MODEL_PROVIDER)
+        completion = chat_model.chat.completions.create(
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": news_system_prompt},
                 {"role": "user", "content": user_content}
             ],
             temperature=0.05,
-            max_tokens=8000,
-            top_p=0.9
+            response_format={ "type": Format }
         )
         # Get response and parse with new logic
         response_content = completion.choices[0].message.content

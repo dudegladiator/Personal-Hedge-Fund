@@ -1,5 +1,4 @@
 import json
-import sys
 import statistics
 from typing import Any, Dict, TypedDict
 from src.llm.models import get_model
@@ -11,9 +10,9 @@ from utils.config import settings, get_sync_database
 logger = setup_logger("src/agents/fundamental_agent.py")
 db = get_sync_database()
 
-# Initialize Groq groq_client
-groq_client = get_model(model_provider="GROQ")
-model = "llama-3.3-70b-versatile"  # You can change this to your preferred model
+MODEL_PROVIDER = "GEMINI"
+MODEL_NAME = "gemini-2.0-flash"
+Format = "json_object" # json_object # text
 
 class FinancialAnalysisState(TypedDict):
     fundamental_data: Dict[str, Any]  # Input financial data
@@ -499,10 +498,12 @@ def fundamental_agent(symbol: str):
     
     # Make the request to the LLM
     try:
-        response = groq_client.chat.completions.create(
-            model=model, 
+        chat_model = get_model(model_provider=MODEL_PROVIDER)
+        response = chat_model.chat.completions.create(
+            model=MODEL_NAME, 
             messages=messages,
-            temperature=0.6
+            temperature=0.6,
+            response_format=Format
         )
         
         return response.choices[0].message.content
@@ -512,7 +513,6 @@ def fundamental_agent(symbol: str):
         return f"An error occurred during financial analysis: {str(e)}"
 
 if __name__ == "__main__":
-    # Example usage
     symbol = "RELIANCE"
     analysis_report = fundamental_agent(symbol)
     print(analysis_report)
