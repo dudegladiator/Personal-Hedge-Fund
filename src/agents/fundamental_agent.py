@@ -12,7 +12,7 @@ db = get_sync_database()
 
 MODEL_PROVIDER = "GEMINI"
 MODEL_NAME = "gemini-2.0-flash"
-Format = "json_object" # json_object # text
+FORMAT = { "type": "json_object" } # json_object # text
 
 class FinancialAnalysisState(TypedDict):
     fundamental_data: Dict[str, Any]  # Input financial data
@@ -503,7 +503,7 @@ def fundamental_agent(symbol: str):
             model=MODEL_NAME, 
             messages=messages,
             temperature=0.6,
-            response_format=Format
+            response_format=FORMAT
         )
         
         return response.choices[0].message.content

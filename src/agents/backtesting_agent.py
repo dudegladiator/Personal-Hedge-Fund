@@ -1,5 +1,5 @@
 import ast
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.agents.sentimental_agent import get_recommendation_from_announcements, get_recommendation_from_news
 from src.backtesting.technical_indicators import get_basic_technical_indicators
 from utils.llm import parse_llm_response
@@ -18,7 +18,7 @@ db = get_sync_database()
 
 MODEL_PROVIDER = "GEMINI"
 MODEL_NAME = "gemini-2.0-flash"
-Format = "json_object" # json_object # text
+FORMAT = { "type": "json_object" } # json_object # text
 
 def format_data_for_backtesting(company_dashboard, company_annoucement, company_news, company_basic_technical_indicators):
     
@@ -47,7 +47,8 @@ def generate_strategy_code(symbol: str):
         company_dashboard = db.company_dashboard.find_one({"symbol": symbol})
         company_annoucement = get_recommendation_from_announcements(symbol)
         company_news = get_recommendation_from_news(symbol)
-        company_basic_technical_indicators = get_basic_technical_indicators(symbol=symbol, start_date=datetime(2023, 1, 1), end_date=datetime(2024, 1, 1))
+        # Help Needed For Now, we are having 1 year data for technical indicators
+        company_basic_technical_indicators = get_basic_technical_indicators(symbol=symbol, start_date=datetime.now() - timedelta(days=365), end_date=datetime.now(), interval="1D")
         
         system_prompt, profile_prompt = format_data_for_backtesting(company_dashboard, company_annoucement, company_news, company_basic_technical_indicators)
 
@@ -65,11 +66,11 @@ def generate_strategy_code(symbol: str):
             ],
             model=MODEL_NAME,
             temperature=0.65,
-            response_format=Format
+            response_format=FORMAT
         )
 
         response_content = chat_completion.choices[0].message.content
-        
+        print(response_content)
         result = parse_llm_response(response_content)
         # Add datetime of the run
         result["run_datetime"] = datetime.now().isoformat()

@@ -1,5 +1,5 @@
 from typing import Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import talib as ta
@@ -176,8 +176,8 @@ def analyze_volatility_indicators(data: pd.DataFrame) -> Dict:
 
 def get_basic_technical_indicators(
     symbol: str,
-    start_date: datetime,
-    end_date: datetime,
+    start_date: datetime = datetime.now() - timedelta(days=365),
+    end_date: datetime = datetime.now(),
     interval: str = "1D"
 ) -> TechnicalAnalysisValues:
     """
@@ -217,9 +217,7 @@ def get_basic_technical_indicators(
 # Example usage
 if __name__ == "__main__":
     analysis = get_basic_technical_indicators(
-        symbol="RELIANCE",
-        start_date=datetime(2023, 1, 1),
-        end_date=datetime(2024, 1, 1)
+        symbol="RELIANCE"
     )
     
     print(analysis)

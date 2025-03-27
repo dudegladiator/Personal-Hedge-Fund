@@ -11,7 +11,7 @@ logger = setup_logger("src/agents/sentimental_agent.py")
 db = get_sync_database()
 MODEL_PROVIDER = "GEMINI"
 MODEL_NAME = "gemini-2.0-flash"
-Format = "json_object" # json_object # text
+FORMAT = { "type": "json_object" } # json_object # text
 
 def get_latest_announcements(entries, date_field, days=90, date_format="%d-%m-%Y"):
     """
@@ -152,11 +152,10 @@ def get_recommendation_from_announcements(symbol, exchange="NSE", past_days=90):
                 {"role": "user", "content": user_content}
             ],
             temperature=0.05,
-            response_format={ "type": Format }
+            response_format=FORMAT
         )
         
         # Get response and parse with new logic
-        print(completion)
         response_content = completion.choices[0].message.content
         result = parse_llm_response(response_content)
         result["run_datetime"] = datetime.now().isoformat()
@@ -212,7 +211,7 @@ def get_recommendation_from_news(symbol, exchange="NSE", past_days=5):
                 {"role": "user", "content": user_content}
             ],
             temperature=0.05,
-            response_format={ "type": Format }
+            response_format=FORMAT
         )
         # Get response and parse with new logic
         response_content = completion.choices[0].message.content
