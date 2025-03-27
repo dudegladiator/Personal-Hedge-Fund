@@ -419,12 +419,17 @@ def create_financial_analysis_subgraph():
     builder.add_edge("analyze_stability", "mark_complete")
     
     # Compile the graph
-    return builder.compile()
+    return builder.compile(name="Ratios for Fundamental Analysis")
 
-def run_financial_analysis(fundamental_data):
+def run_financial_analysis(symbol, fundamental_data):
     """Run the financial analysis subgraph with the provided data"""
     # Create the subgraph
     financial_analysis_graph = create_financial_analysis_subgraph()
+    
+    config = {
+        "tags": ["fundamental_analysis", "fundamental_ratios"],
+        "metadata": {"company": symbol, "file": "src/agents/fundamental_agent.py"}
+    }
     
     # Define initial state
     initial_state = {
@@ -436,7 +441,7 @@ def run_financial_analysis(fundamental_data):
         "analysis_complete": False
     }
     
-    final_state = financial_analysis_graph.invoke(initial_state)
+    final_state = financial_analysis_graph.invoke(initial_state, config)
     
     # Return the complete analysis results
     return {
@@ -464,7 +469,7 @@ def fundamental_agent(symbol: str):
         return f"No fundamental data found for symbol: {symbol}"
     
     # Run the financial analysis subgraph
-    analysis_results = run_financial_analysis(fundamental_data)
+    analysis_results = run_financial_analysis(symbol, fundamental_data)
     
     # Initial messages
     messages = [

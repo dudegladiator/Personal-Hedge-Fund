@@ -188,7 +188,8 @@ def get_recommendation_from_announcements(symbol, exchange, past_days=90):
             ],
             temperature=0.05,
             max_tokens=8000,
-            top_p=0.9
+            top_p=0.9,
+            response_format={ "type": "json_object" }
         )
         
         # Get response and parse with new logic
