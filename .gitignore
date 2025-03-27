@@ -171,3 +171,5 @@ cython_debug/
 .pypirc
 ta-lib-0.6.4
 .qodo
+
+Virtual/

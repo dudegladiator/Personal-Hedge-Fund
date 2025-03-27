@@ -1,5 +1,4 @@
 import json
-import re
 from src.llm.models import get_model  # Assuming same model setup as previous example
 
 groq_client = get_model(model_provider="GROQ")
@@ -65,19 +64,18 @@ investment_filter_rules = """
 def parse_investment_response(response_content):
     """Parse LLM response and validate structure"""
     try:
-        # Extract JSON using regex
-        json_match = re.search(r'```json\s*({.*?})\s*```', response_content, re.DOTALL)
-        if json_match:
-            filters = json.loads(json_match.group(1))
-            
-            # Validate required fields
-            required_fields = ['market_cap', 'risk_appetite', 'index_inclusion']
-            for field in required_fields:
-                if field not in filters:
-                    return {"error": f"Missing required field: {field}"}
-            
-            return filters
-        return {"error": "No valid JSON found in response"}
+        # Directly parse the response content as JSON.
+        filters = json.loads(response_content)
+        
+        # Validate required fields
+        required_fields = ['market_cap', 'risk_appetite', 'index_inclusion']
+        for field in required_fields:
+            if field not in filters:
+                return {"error": f"Missing required field: {field}"}
+        
+        return filters
+    except json.JSONDecodeError:
+        return {"error": "Invalid JSON format"}
     except Exception as e:
         return {"error": f"Parsing error: {str(e)}"}
 
@@ -90,7 +88,7 @@ def get_investment_filters(user_prompt):
 Return JSON filters with this structure:
 {{
   "investment_amount": "null|specific_amount",
-  "market_cap": ["large","mid","small"],
+  "market_cap": ["large", "mid", "small"],
   "ratios": {{
     "pe_ratio": "value|sector comparison",
     "sales_growth": "percentage",
@@ -101,7 +99,7 @@ Return JSON filters with this structure:
   }},
   "dividend_payment": "boolean",
   "volatility": "low|medium|high",
-  "index_inclusion": ["Nifty50", "Sensex", etc.],
+  "index_inclusion": ["Nifty50", "Sensex", "etc."],
   "sector_trends": ["trending sectors"],
   "risk_appetite": "low|medium|high",
   "reinvestment_rd_capex": "boolean|percentage",
@@ -126,6 +124,8 @@ Return JSON filters with this structure:
         )
         
         response_content = completion.choices[0].message.content
+        # Optionally print the raw response for debugging:
+        print("RAW RESPONSE:", response_content)
         return parse_investment_response(response_content)
     
     except Exception as e:
