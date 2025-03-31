@@ -309,7 +309,8 @@ def get_stock_news(
 def get_company_dashboard(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get company dashboard data from MarketsMojo
@@ -330,7 +331,7 @@ def get_company_dashboard(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(hours=24)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -1208,7 +1209,8 @@ def get_stock_quality_ratios(
 def get_company_peers(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[List[Dict]]:
     """
     Get company peers from MarketsMojo
@@ -1230,7 +1232,7 @@ def get_company_peers(
                     "exchange": exchange.lower(),
                     "peers": {"$exists": True},
                     "peers_updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )

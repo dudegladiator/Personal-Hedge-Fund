@@ -87,7 +87,7 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         result = parse_llm_response(response_content)
         result["run_datetime"] = datetime.now().isoformat()
         
-        logger.info(f"Successfully generated announcement recommendation for {symbol}: {result}")
+        logger.info(f"Successfully generated announcement recommendation for {symbol}")
         return result
     
     except Exception as e:
@@ -150,7 +150,7 @@ def get_recommendation_from_news(symbol, exchange="nse", past_days=5, force = Fa
         result = parse_llm_response(response_content)
         result["run_datetime"] = datetime.now().isoformat()
         
-        logger.info(f"Successfully generated news recommendation for {symbol}: {result}")
+        logger.info(f"Successfully generated news recommendation for {symbol}")
         return result
     
     except Exception as e:
