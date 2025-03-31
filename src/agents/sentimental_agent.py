@@ -1,104 +1,26 @@
 import json
-import re
-from utils.config import settings, get_sync_database
+from src.data_source.market_apis import get_corporate_announcements, get_stock_news
 from utils.app_logger import setup_logger
 from src.llm.models import get_model
-from datetime import datetime, timedelta
+from datetime import datetime
 from src.prompts import announcements_system_prompt, news_system_prompt
 from utils.llm import parse_llm_response
+from utils.util import get_latest_announcements, get_latest_news
 
 logger = setup_logger("src/agents/sentimental_agent.py")
-db = get_sync_database()
 MODEL_PROVIDER = "GEMINI"
 MODEL_NAME = "gemini-2.0-flash"
-FORMAT = { "type": "json_object" } # json_object # text
-
-def get_latest_announcements(entries, date_field, days=90, date_format="%d-%m-%Y"):
-    """
-    Retrieves all announcement entries from the last specified number of days, sorted by date (newest first).
-
-    Args:
-        entries (list): List of announcement dictionaries.
-        date_field (str): Key of the date field to filter/sort by (e.g., "date", "ex_date").
-        days (int): Number of days to look back (default: 5).
-        date_format (str): Format of the date string (default: "%d-%m-%Y" for "dd-mm-yyyy").
-
-    Returns:
-        list: Announcements from the last 'days' days, sorted by date_field in descending order.
-    """
-    valid_entries = [entry for entry in entries if date_field in entry]
-    if not valid_entries:
-        return []
-    
-    # Calculate the cutoff date (today - days)
-    cutoff_date = datetime.now() - timedelta(days=days)
-    
-    try:
-        # Filter entries within the last 'days' days
-        recent_entries = [
-            entry for entry in valid_entries
-            if datetime.strptime(entry[date_field], date_format) >= cutoff_date
-        ]
-        
-        # Sort by date_field in descending order
-        sorted_entries = sorted(
-            recent_entries,
-            key=lambda x: datetime.strptime(x[date_field], date_format),
-            reverse=True
-        )
-        return sorted_entries
-    
-    except ValueError as e:
-        print(f"Date parsing error: {e}")
-        return []
-
-def get_latest_news(news_list, days):
-    """
-    Retrieves all news items from the last specified number of days, sorted by date (newest first).
-
-    Args:
-        news_list (list): List of news dictionaries with 'published_date' field.
-        days (int): Number of days to look back (default: 5).
-
-    Returns:
-        list: News items from the last 'days' days, sorted by published_date in descending order.
-    """
-    valid_news = [news for news in news_list if "published_date" in news]
-    if not valid_news:
-        return []
-    
-    # Calculate the cutoff date (today - days)
-    cutoff_date = datetime.now() - timedelta(days=days)
-    
-    try:
-        # Filter news items within the last 'days' days
-        recent_news = [
-            news for news in valid_news
-            if datetime.strptime(news["published_date"], "%Y-%m-%d %H:%M:%S") >= cutoff_date
-        ]
-        
-        # Sort by published_date in descending order
-        sorted_news = sorted(
-            recent_news,
-            key=lambda x: datetime.strptime(x["published_date"], "%Y-%m-%d %H:%M:%S"),
-            reverse=True
-        )
-        return sorted_news
-    
-    except ValueError as e:
-        print(f"Date parsing error in news: {e}")
-        return []
+FORMAT = { "type": "json_object" }
  
-# Function 1: Analyze latest announcements using Groq
-def get_recommendation_from_announcements(symbol, exchange="NSE", past_days=90):
+def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, force = False):
+    logger.info(f"Getting announcement recommendations for {symbol} on {exchange} for past {past_days} days")
     try:
-        # Fetch data from MongoDB (unchanged)
-        data = db.corporate_announcements_news.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
+        data = get_corporate_announcements(symbol, exchange, refresh_days=1, force=force)
         if not data:
+            logger.warning(f"No data found for symbol {symbol} on {exchange}")
             return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database."}
         
-        # Extract announcement categories (unchanged)
-        announcements = data.get("announcements", {})
+        announcements = data
         board_meetings = announcements.get("board_meetings", [])
         dividends = announcements.get("dividends", [])
         splits = announcements.get("splits", [])
@@ -111,10 +33,17 @@ def get_recommendation_from_announcements(symbol, exchange="NSE", past_days=90):
         bonus_latest = get_latest_announcements(bonus, "ex_date", days=past_days)
         rights_latest = get_latest_announcements(rights, "ex_date", days=past_days)
         
+        logger.info(f"Latest announcements found for {symbol}: "
+                    f"Board Meetings: {len(board_meetings_latest)}, "
+                    f"Dividends: {len(dividends_latest)}, "
+                    f"Splits: {len(splits_latest)}, "
+                    f"Bonus Issues: {len(bonus_latest)}, "
+                    f"Rights Issues: {len(rights_latest)}")
+        
         if not any([board_meetings_latest, dividends_latest, splits_latest, bonus_latest, rights_latest]):
+            logger.warning(f"No recent announcements found for {symbol}")
             return {"recommendation_sign": "NEUTRAL", "details": "No recent announcement data available for analysis."}
         
-        # Format data (unchanged)
         data_str = (
             f"Latest Board Meetings:\n{json.dumps(board_meetings_latest, indent=2)}\n\n"
             f"Latest Dividends:\n{json.dumps(dividends_latest, indent=2)}\n\n"
@@ -143,7 +72,6 @@ def get_recommendation_from_announcements(symbol, exchange="NSE", past_days=90):
             f"  \"analysis_overview\": \"Strong dividend announcement with clear growth signals\"\n"
             f"}}"
         )
-        
         chat_model = get_model(model_provider=MODEL_PROVIDER)
         completion = chat_model.chat.completions.create(
             model=MODEL_NAME,
@@ -155,31 +83,34 @@ def get_recommendation_from_announcements(symbol, exchange="NSE", past_days=90):
             response_format=FORMAT
         )
         
-        # Get response and parse with new logic
         response_content = completion.choices[0].message.content
         result = parse_llm_response(response_content)
         result["run_datetime"] = datetime.now().isoformat()
+        
+        logger.info(f"Successfully generated announcement recommendation for {symbol}: {result}")
         return result
     
     except Exception as e:
+        logger.error(f"Error in announcement analysis for {symbol}: {str(e)}", exc_info=True)
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
-# Function 2: Analyze latest news using Groq
-def get_recommendation_from_news(symbol, exchange="NSE", past_days=5):
+def get_recommendation_from_news(symbol, exchange="nse", past_days=5, force = False):
+    logger.info(f"Getting news recommendations for {symbol} on {exchange} for past {past_days} days")
     try:
-        # Fetch data from MongoDB (unchanged)
-        data = db.corporate_announcements_news.find_one({"symbol": symbol.upper(), "exchange": exchange.lower()})
+        data = get_stock_news(symbol, exchange, refresh_days=1, force=force)
         if not data:
+            logger.warning(f"No data found for symbol {symbol} on {exchange}")
             return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database."}
         
-        # Extract and sort news (unchanged)
-        news = data.get("news", [])
-        news_latest = get_latest_news(news, days = past_days)
+        news = data
+        news_latest = get_latest_news(news, days=past_days)
         
         if not news_latest:
+            logger.warning(f"No recent news found for {symbol}")
             return {"recommendation_sign": "NEUTRAL", "details": "No recent news data available for analysis."}
         
-        # Format data (unchanged)
+        logger.info(f"Latest news found for {symbol}: {len(news_latest)}")
+        
         data_str = f"Latest News:\n{json.dumps(news_latest, indent=2)}"
 
         user_content = (
@@ -203,6 +134,7 @@ def get_recommendation_from_news(symbol, exchange="NSE", past_days=5):
             f"}}"
         )
         
+        logger.info(f"Sending news analysis request to LLM for {symbol}")
         chat_model = get_model(model_provider=MODEL_PROVIDER)
         completion = chat_model.chat.completions.create(
             model=MODEL_NAME,
@@ -213,14 +145,16 @@ def get_recommendation_from_news(symbol, exchange="NSE", past_days=5):
             temperature=0.05,
             response_format=FORMAT
         )
-        # Get response and parse with new logic
+
         response_content = completion.choices[0].message.content
         result = parse_llm_response(response_content)
-        # Add datetime of the run
         result["run_datetime"] = datetime.now().isoformat()
+        
+        logger.info(f"Successfully generated news recommendation for {symbol}: {result}")
         return result
     
     except Exception as e:
+        logger.error(f"Error in news analysis for {symbol}: {str(e)}", exc_info=True)
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
 #Add the Agent
@@ -228,11 +162,11 @@ def get_recommendation_from_news(symbol, exchange="NSE", past_days=5):
 # Example usage
 if __name__ == "__main__":
     # Test the announcements function
-    result1 = get_recommendation_from_announcements("526961", "NSE")
+    result1 = get_recommendation_from_announcements("RELIANCE", "nse")
     print("Recommendation from Announcements:")
     print(json.dumps(result1, indent=2))
     
     # Test the news function
-    result2 = get_recommendation_from_news("526961", "NSE", 200)
+    result2 = get_recommendation_from_news("RELIANCE", "nse", 200)
     print("\nRecommendation from News:")
     print(json.dumps(result2, indent=2))

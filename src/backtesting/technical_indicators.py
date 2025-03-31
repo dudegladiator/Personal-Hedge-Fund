@@ -5,6 +5,9 @@ import numpy as np
 import talib as ta
 from src.backtesting.data_loader import DataLoader
 from pydantic import BaseModel
+from utils.app_logger import setup_logger
+
+logger = setup_logger("src/backtesting/technical_indicators.py")
 
 class TechnicalAnalysisValues(BaseModel):
     # Trend Indicators
@@ -180,18 +183,7 @@ def get_basic_technical_indicators(
     end_date: datetime = datetime.now(),
     interval: str = "1D"
 ) -> TechnicalAnalysisValues:
-    """
-    Calculate and return key technical indicator values for a given stock
-
-    Args:
-        symbol: Stock symbol
-        start_date: Start date for analysis
-        end_date: End date for analysis
-        interval: Data interval (1d, 1h, etc.)
-
-    Returns:
-        TechnicalAnalysisValues object containing all key indicator values
-    """
+    logger.info(f"Analyzing basic technical indicators for {symbol}")
     try:
         # Initialize data loader
         data_loader = DataLoader()
@@ -203,7 +195,8 @@ def get_basic_technical_indicators(
         momentum_analysis = analyze_momentum_indicators(data)
         volume_analysis = analyze_volume_indicators(data)
         volatility_analysis = analyze_volatility_indicators(data)
-
+        
+        logger.info(f"Successfully analyzed basic technical indicators for {symbol}")
         return TechnicalAnalysisValues(
             **trend_analysis,
             **momentum_analysis,

@@ -1,14 +1,14 @@
 import json
 import statistics
 from typing import Any, Dict, TypedDict
+from src.data_source.market_apis import get_overall_fundamental_data
 from src.llm.models import get_model
 from langgraph.types import Command
 from langgraph.graph import StateGraph, START
 from utils.app_logger import setup_logger
-from utils.config import settings, get_sync_database
+from src.prompts import fundamental_agent_system_prompt
 
 logger = setup_logger("src/agents/fundamental_agent.py")
-db = get_sync_database()
 
 MODEL_PROVIDER = "GEMINI"
 MODEL_NAME = "gemini-2.0-flash"
@@ -31,9 +31,6 @@ def compute_operating_ratios(fundamental_data):
     balance_sheet = data["balance_sheet"]["periods"]
     profit_loss = data["profit_loss"]["periods"]
 
-    # Extract financial metrics for the latest year
-    latest_year = "Mar'24"
-
     # Compute Total Average Assets
     total_assets_list = [values["total_assets"] for values in balance_sheet.values()]
     avg_total_assets = sum(total_assets_list) / len(total_assets_list)
@@ -47,12 +44,12 @@ def compute_operating_ratios(fundamental_data):
     avg_inventory = sum(inventory_list) / len(inventory_list)
 
     # Extract values for latest period
-    operating_income = profit_loss[latest_year]["operating_income"]
-    net_sales = profit_loss[latest_year]["net_sales"]
-    operating_profit_pbdit = profit_loss[latest_year]["operating_profit_(pbdit)"]
-    raw_materials_consumed = profit_loss[latest_year]["raw_materials_consumed"]
-    power_fuel_cost = profit_loss[latest_year]["power_&_fuel_cost"]
-    employee_cost = profit_loss[latest_year]["employee_cost"]
+    operating_income = profit_loss[sorted(profit_loss.keys())[-1]]["operating_income"]
+    net_sales = profit_loss[sorted(profit_loss.keys())[-1]]["net_sales"]
+    operating_profit_pbdit = profit_loss[sorted(profit_loss.keys())[-1]]["operating_profit_(pbdit)"]
+    raw_materials_consumed = profit_loss[sorted(profit_loss.keys())[-1]]["raw_materials_consumed"]
+    power_fuel_cost = profit_loss[sorted(profit_loss.keys())[-1]]["power_&_fuel_cost"]
+    employee_cost = profit_loss[sorted(profit_loss.keys())[-1]]["employee_cost"]
 
     # Calculate Operating Ratios
     fixed_asset_turnover = operating_income / avg_total_assets if avg_total_assets else None
@@ -118,9 +115,8 @@ def calculate_profitability_ratios(fundamental_data):
     """
     data = fundamental_data
         
-    latest_period = "Mar'24"  # Extract the latest period data
-    profit_loss = data["profit_loss"]["periods"][latest_period]
-    yearly_data = data["yearly"]["periods"][latest_period]
+    profit_loss = data["profit_loss"]["periods"][sorted(data["profit_loss"]["periods"].keys())[-1]]
+    yearly_data = data["yearly"]["periods"][sorted(data["yearly"]["periods"].keys())[-1]]
     stock_quality = data["stock_quality"]["quality_ratios"]
     balance_sheet_data = data["balance_sheet"]["periods"]
 
@@ -200,21 +196,18 @@ def compute_leverage_ratios(fundamental_data):
     profit_loss = data["profit_loss"]["periods"]
     stock_quality = data["stock_quality"]["quality_ratios"]
     
-    # Extract financial metrics for the latest year
-    latest_year = "Mar'24"
-    
     # Interest Coverage Ratio
-    pbdit = profit_loss[latest_year]["operating_profit_(pbdit)"]
-    depreciation = profit_loss[latest_year]["depreciation"]
-    interest = profit_loss[latest_year]["interest"]
+    pbdit = profit_loss[sorted(profit_loss.keys())[-1]]["operating_profit_(pbdit)"]
+    depreciation = profit_loss[sorted(profit_loss.keys())[-1]]["depreciation"]
+    interest = profit_loss[sorted(profit_loss.keys())[-1]]["interest"]
     interest_coverage_ratio = (pbdit - depreciation) / interest if interest else None
     
     # Debt-to-Equity Ratio (directly available)
     debt_to_equity = stock_quality.get("net_debt_to_equity_avg")
     
     # Debt-to-Asset Ratio
-    total_debt = balance_sheet[latest_year]["total_debt"]
-    total_assets = balance_sheet[latest_year]["total_assets"]
+    total_debt = balance_sheet[sorted(balance_sheet.keys())[-1]]["total_debt"]
+    total_assets = balance_sheet[sorted(balance_sheet.keys())[-1]]["total_assets"]
     debt_to_asset_ratio = total_debt / total_assets if total_assets else None
     
     # Financial Leverage Ratio (Average Total Assets / Average Total Equity)
@@ -450,7 +443,7 @@ def run_financial_analysis(symbol, fundamental_data):
         "stability_metrics": final_state["stability_metrics"]
     }
 
-def fundamental_agent(symbol: str):
+def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, refresh_days: int = 7) -> str:
     """
     Creates a financial analysis agent using LangGraph subgraph
     
@@ -461,7 +454,7 @@ def fundamental_agent(symbol: str):
         Analysis report from the LLM
     """
     # Get fundamental data from database
-    fundamental_data = db.fundamental_data.find_one({"symbol": symbol})
+    fundamental_data = get_overall_fundamental_data(symbol=symbol, exchange=exchange, force=force, refresh_days=refresh_days)
     
     if not fundamental_data:
         logger.error(f"No fundamental data found for symbol: {symbol}")
@@ -474,21 +467,7 @@ def fundamental_agent(symbol: str):
     messages = [
         {
             "role": "system", 
-            "content": """You are a sophisticated financial analyst specializing in fundamental analysis of companies. 
-            Your task is to analyze financial data comprehensively and provide an investment recommendation.
-            
-            The data provided includes key financial metrics organized into four categories:
-            1. Operating Ratios - showing how efficiently the company utilizes its assets
-            2. Profitability Ratios - indicating the company's ability to generate profits
-            3. Leverage Ratios - revealing the company's debt structure and risk
-            4. Stability Metrics - demonstrating the consistency of the company's performance
-            
-            For each category, you'll receive calculated ratios, confidence levels, and signals.
-            
-            Explain the significance of each ratio and metric and what it indicates about the company's financial health.
-            Evaluate the strengths and weaknesses revealed by these metrics.
-            Conclude with an overall investment recommendation (Bullish/Buy, Neutral/Hold, or Bearish/Sell) based on
-            your comprehensive analysis of all categories."""
+            "content": fundamental_agent_system_prompt
         },
         {
             "role": "user", 

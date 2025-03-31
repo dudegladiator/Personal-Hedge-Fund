@@ -9,8 +9,10 @@ import numpy as np
 import talib as ta
 
 from enum import Enum
-import yfinance as yf
 from src.backtesting.data_loader import DataLoader
+from utils.app_logger import setup_logger
+
+logger = setup_logger("src/backtesting/backtesting_engine.py")
 
 class PositionType(str, Enum):
     LONG = "LONG"
@@ -43,7 +45,6 @@ class BacktestParameters(BaseModel):
     # Trading Parameters
     position_type: PositionType = Field(default=PositionType.LONG)
     position_size: Union[int, float] = Field(default=0)
-    max_positions: int = Field(default=1)
     
     # Risk Management
     stop_loss: float = Field(default=0.0)
@@ -300,7 +301,33 @@ def calculate_metrics(
     Calculate performance metrics from trades
     """
     if not trades:
-        raise ValueError("No trades executed during backtest period")
+        return BacktestResult(
+            initial_capital=params.initial_capital,
+            final_capital=params.initial_capital,  # Unchanged capital
+            total_profit_loss=0.0,
+            total_trades=0,
+            winning_trades=0,
+            losing_trades=0,
+            win_rate=0.0,
+            max_drawdown=0.0,
+            sharpe_ratio=0.0,
+            sortino_ratio=0.0,
+            profit_factor=0.0,
+            avg_profit_per_trade=0.0,
+            avg_loss_per_trade=0.0,
+            risk_reward_ratio=0.0,
+            max_consecutive_wins=0,
+            max_consecutive_losses=0,
+            longest_winning_streak=0,
+            longest_losing_streak=0,
+            total_trading_days=0,
+            position_holding_time=0.0,
+            transaction_costs=0.0,
+            trades_history=[],
+            equity_curve=[params.initial_capital],  # Single point equity curve
+            monthly_returns={},
+            yearly_returns={}
+        )
         
     # Basic metrics
     total_trades = len(trades)
@@ -431,7 +458,6 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         
         # Execute strategy to get signals
         signals = strategy(data)
-        
         # Validate signals DataFrame
         required_columns = ['Signal']
         if not all(col in signals.columns for col in required_columns):
@@ -448,131 +474,133 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
     except Exception as e:
         raise Exception(f"Backtesting failed: {str(e)}")
     
+if __name__ == "__main__":
+    # Example usage
+    
+    your_strategy_code1 = """
+    import pandas as pd
+    import numpy as np
+    import talib as ta
 
-your_strategy_code1 = """
-import pandas as pd
-import numpy as np
-import talib as ta
+    def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
+        signals = pd.DataFrame(index=data.index)
+        signals['Signal'] = 0
+        
+        # Ensure 1D array for TA-Lib
+        close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
+        
+        # Calculate RSI
+        data['RSI'] = ta.RSI(close_prices, timeperiod=14)
+        
+        # Generate signals based on overbought/oversold conditions
+        signals['Signal'] = np.where(data['RSI'] < 30, 1, 0)  # Buy when RSI below 30 (oversold)
+        signals['Signal'] = np.where(data['RSI'] > 70, -1, signals['Signal'])  # Sell when RSI above 70 (overbought)
+        
+        return signals
+    """
 
-def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
-    signals = pd.DataFrame(index=data.index)
-    signals['Signal'] = 0
-    
-    # Ensure 1D array for TA-Lib
-    close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
-    
-    # Calculate RSI
-    data['RSI'] = ta.RSI(close_prices, timeperiod=14)
-    
-    # Generate signals based on overbought/oversold conditions
-    signals['Signal'] = np.where(data['RSI'] < 30, 1, 0)  # Buy when RSI below 30 (oversold)
-    signals['Signal'] = np.where(data['RSI'] > 70, -1, signals['Signal'])  # Sell when RSI above 70 (overbought)
-    
-    return signals
-"""
+    # Corrected strategy_code2 (Bollinger Bands)
+    your_strategy_code2 = """
+    import pandas as pd
+    import numpy as np
+    import talib as ta
 
-# Corrected strategy_code2 (Bollinger Bands)
-your_strategy_code2 = """
-import pandas as pd
-import numpy as np
-import talib as ta
+    def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
+        signals = pd.DataFrame(index=data.index)
+        signals['Signal'] = 0
+        
+        # Ensure we're working with single column Series
+        close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
+        
+        # Calculate Bollinger Bands
+        upper, middle, lower = ta.BBANDS(
+            close_prices, 
+            timeperiod=20, 
+            nbdevup=2, 
+            nbdevdn=2, 
+            matype=0
+        )
+        
+        # Create signals using numpy arrays
+        close_array = close_prices
+        signals.loc[:, 'Signal'] = 0
+        
+        # Generate signals using numpy where
+        signals.loc[close_array <= lower, 'Signal'] = 1
+        signals.loc[close_array >= upper, 'Signal'] = -1
+        
+        # Forward fill NaN values with 0
+        signals['Signal'] = signals['Signal'].fillna(0)
+        
+        return signals
+    """
 
-def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
-    signals = pd.DataFrame(index=data.index)
-    signals['Signal'] = 0
-    
-    # Ensure we're working with single column Series
-    close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
-    
-    # Calculate Bollinger Bands
-    upper, middle, lower = ta.BBANDS(
-        close_prices, 
-        timeperiod=20, 
-        nbdevup=2, 
-        nbdevdn=2, 
-        matype=0
+    # Corrected strategy_code3 (Multiple Indicators)
+    your_strategy_code3 = """
+    import pandas as pd
+    import numpy as np
+    import talib as ta
+
+    def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
+        signals = pd.DataFrame(index=data.index)
+        signals['Signal'] = 0
+        
+        # Ensure we're working with single column Series
+        close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
+        high_prices = data['High'].iloc[:, 0].values.astype(np.float64)
+        low_prices = data['Low'].iloc[:, 0].values.astype(np.float64)
+        
+        # Calculate indicators
+        sma_200 = ta.SMA(close_prices, timeperiod=200)
+        rsi = ta.RSI(close_prices, timeperiod=14)
+        sma_20 = ta.SMA(close_prices, timeperiod=20)
+        sma_50 = ta.SMA(close_prices, timeperiod=50)
+        
+        # Convert to pandas Series
+        data_dict = {
+            'Close': close_prices,
+            'SMA_200': sma_200,
+            'RSI': rsi,
+            'SMA_20': sma_20,
+            'SMA_50': sma_50
+        }
+        
+        # Create DataFrame for calculations
+        indicator_df = pd.DataFrame(data_dict, index=data.index)
+        
+        # Generate signals using vectorized operations
+        buy_condition = (
+            (indicator_df['Close'] > indicator_df['SMA_200']) & 
+            (indicator_df['SMA_20'] > indicator_df['SMA_50']) & 
+            (indicator_df['RSI'] > 50)
+        )
+        
+        sell_condition = (
+            (indicator_df['Close'] < indicator_df['SMA_200']) & 
+            (indicator_df['SMA_20'] < indicator_df['SMA_50']) & 
+            (indicator_df['RSI'] < 50)
+        )
+        
+        # Apply conditions
+        signals.loc[buy_condition, 'Signal'] = 1
+        signals.loc[sell_condition, 'Signal'] = -1
+        
+        # Forward fill NaN values with 0
+        signals['Signal'] = signals['Signal'].fillna(0)
+        
+        return signals
+    """
+        
+    params = BacktestParameters(
+        symbol="RELIANCE",
+        strategy_code=your_strategy_code1,  # LLM generated code as string
+        start_date=datetime(2022, 1, 1),
+        end_date=datetime(2023, 12, 31),
+        initial_capital=100000,
+        position_type=PositionType.LONG,
+        stop_loss=0.02,  # 2%
+        take_profit=0.05,  # 5%
     )
-    
-    # Create signals using numpy arrays
-    close_array = close_prices
-    signals.loc[:, 'Signal'] = 0
-    
-    # Generate signals using numpy where
-    signals.loc[close_array <= lower, 'Signal'] = 1
-    signals.loc[close_array >= upper, 'Signal'] = -1
-    
-    # Forward fill NaN values with 0
-    signals['Signal'] = signals['Signal'].fillna(0)
-    
-    return signals
-"""
 
-# Corrected strategy_code3 (Multiple Indicators)
-your_strategy_code3 = """
-import pandas as pd
-import numpy as np
-import talib as ta
-
-def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
-    signals = pd.DataFrame(index=data.index)
-    signals['Signal'] = 0
-    
-    # Ensure we're working with single column Series
-    close_prices = data['Close'].iloc[:, 0].values.astype(np.float64)
-    high_prices = data['High'].iloc[:, 0].values.astype(np.float64)
-    low_prices = data['Low'].iloc[:, 0].values.astype(np.float64)
-    
-    # Calculate indicators
-    sma_200 = ta.SMA(close_prices, timeperiod=200)
-    rsi = ta.RSI(close_prices, timeperiod=14)
-    sma_20 = ta.SMA(close_prices, timeperiod=20)
-    sma_50 = ta.SMA(close_prices, timeperiod=50)
-    
-    # Convert to pandas Series
-    data_dict = {
-        'Close': close_prices,
-        'SMA_200': sma_200,
-        'RSI': rsi,
-        'SMA_20': sma_20,
-        'SMA_50': sma_50
-    }
-    
-    # Create DataFrame for calculations
-    indicator_df = pd.DataFrame(data_dict, index=data.index)
-    
-    # Generate signals using vectorized operations
-    buy_condition = (
-        (indicator_df['Close'] > indicator_df['SMA_200']) & 
-        (indicator_df['SMA_20'] > indicator_df['SMA_50']) & 
-        (indicator_df['RSI'] > 50)
-    )
-    
-    sell_condition = (
-        (indicator_df['Close'] < indicator_df['SMA_200']) & 
-        (indicator_df['SMA_20'] < indicator_df['SMA_50']) & 
-        (indicator_df['RSI'] < 50)
-    )
-    
-    # Apply conditions
-    signals.loc[buy_condition, 'Signal'] = 1
-    signals.loc[sell_condition, 'Signal'] = -1
-    
-    # Forward fill NaN values with 0
-    signals['Signal'] = signals['Signal'].fillna(0)
-    
-    return signals
-"""
-    
-params = BacktestParameters(
-    symbol="RELIANCE",
-    strategy_code=your_strategy_code1,  # LLM generated code as string
-    start_date=datetime(2022, 1, 1),
-    end_date=datetime(2023, 12, 31),
-    initial_capital=100000,
-    position_type=PositionType.LONG,
-    stop_loss=0.02,  # 2%
-    take_profit=0.05,  # 5%
-)
-
-result = execute_backtesting(params)
-print(result.model_dump_json())
+    result = execute_backtesting(params)
+    print(result.model_dump_json())
