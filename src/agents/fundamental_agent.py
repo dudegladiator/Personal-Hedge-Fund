@@ -649,7 +649,7 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         response = chat_model.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
-            temperature=0.5, # Slightly lower temp for more factual summary
+            temperature=0.2, # Slightly lower temp for more factual summary
             response_format=FORMAT # Request JSON output
         )
 
