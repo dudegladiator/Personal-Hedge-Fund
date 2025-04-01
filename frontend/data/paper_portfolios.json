@@ -1,0 +1,157 @@
+{
+    "alice": {
+        "cash": 75700.0,
+        "holdings": [
+            {
+                "ticker": "TSLA",
+                "quantity": 3.680229110485604,
+                "avg_cost": 81.51666404280336
+            },
+            {
+                "ticker": "WMT",
+                "quantity": 9.973143848262744,
+                "avg_cost": 357.46
+            },
+            {
+                "ticker": "GME",
+                "quantity": 19.3191650443435,
+                "avg_cost": 184.92
+            },
+            {
+                "ticker": "AAPL",
+                "quantity": 80.0470535514228,
+                "avg_cost": 44.63
+            },
+            {
+                "ticker": "PFE",
+                "quantity": 10.898746148448701,
+                "avg_cost": 327.79
+            },
+            {
+                "ticker": "META",
+                "quantity": 59.157145222718995,
+                "avg_cost": 60.39
+            },
+            {
+                "ticker": "RBLX",
+                "quantity": 6.902314618030062,
+                "avg_cost": 517.58
+            },
+            {
+                "ticker": "PG",
+                "quantity": 16.50191694766502,
+                "avg_cost": 216.49
+            }
+        ],
+        "history": [
+            {
+                "timestamp": "2025-04-01T01:25:45.633746",
+                "action": "BUY",
+                "details": {
+                    "ticker": "TSLA",
+                    "quantity": 1.3151,
+                    "price": 76.04,
+                    "cost": 100.0
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:25:48.041083",
+                "action": "BUY",
+                "details": {
+                    "ticker": "TSLA",
+                    "quantity": 1.2337,
+                    "price": 81.06,
+                    "cost": 100.0
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:25:49.900447",
+                "action": "BUY",
+                "details": {
+                    "ticker": "TSLA",
+                    "quantity": 1.1315,
+                    "price": 88.38,
+                    "cost": 100.0
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:26:10.955709",
+                "action": "ADD_FUNDS",
+                "details": {
+                    "amount": 1000.0
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.816250",
+                "action": "BUY",
+                "details": {
+                    "ticker": "WMT",
+                    "quantity": 9.9731,
+                    "price": 357.46,
+                    "cost": 3565.0
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.817315",
+                "action": "BUY",
+                "details": {
+                    "ticker": "GME",
+                    "quantity": 19.3192,
+                    "price": 184.92,
+                    "cost": 3572.5
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.818067",
+                "action": "BUY",
+                "details": {
+                    "ticker": "AAPL",
+                    "quantity": 80.0471,
+                    "price": 44.63,
+                    "cost": 3572.5
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.819074",
+                "action": "BUY",
+                "details": {
+                    "ticker": "PFE",
+                    "quantity": 10.8987,
+                    "price": 327.79,
+                    "cost": 3572.5
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.819074",
+                "action": "BUY",
+                "details": {
+                    "ticker": "META",
+                    "quantity": 59.1571,
+                    "price": 60.39,
+                    "cost": 3572.5
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.820076",
+                "action": "BUY",
+                "details": {
+                    "ticker": "RBLX",
+                    "quantity": 6.9023,
+                    "price": 517.58,
+                    "cost": 3572.5
+                }
+            },
+            {
+                "timestamp": "2025-04-01T01:30:05.820076",
+                "action": "BUY",
+                "details": {
+                    "ticker": "PG",
+                    "quantity": 16.5019,
+                    "price": 216.49,
+                    "cost": 3572.5
+                }
+            }
+        ],
+        "last_simulated_update": "2025-04-01T01:20:48.585105"
+    }
+}

@@ -2,19 +2,16 @@ import ast
 import importlib
 import tempfile
 from pydantic import BaseModel, Field, field_validator
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import pandas as pd
 import numpy as np
 import talib as ta
-
 from enum import Enum
-import yfinance as yf
 from src.backtesting.data_loader import DataLoader
+from utils.app_logger import setup_logger
 
-class PositionType(str, Enum):
-    LONG = "LONG"
-    SHORT = "SHORT"
+logger = setup_logger("src/backtesting/backtesting_engine.py")
 
 class TimeFrame(str, Enum):
     DAILY = "1D"
@@ -22,11 +19,6 @@ class TimeFrame(str, Enum):
     MINUTE_15 = "15M"
     MINUTE_5 = "5M"
     MINUTE_1 = "1M"
-
-class TaxStructure(BaseModel):
-    stt: float = Field(default=0.001, description="Securities Transaction Tax")
-    gst: float = Field(default=0.18, description="GST on brokerage")
-    stamp_duty: float = Field(default=0.00015, description="Stamp duty")
 
 class TradingHours(BaseModel):
     start: str = Field(default="09:15", description="Trading start time")
@@ -38,22 +30,10 @@ class BacktestParameters(BaseModel):
     strategy_code: str
     start_date: datetime
     end_date: datetime
-    initial_capital: float = Field(default=100000.0)
-    
-    # Trading Parameters
-    position_type: PositionType = Field(default=PositionType.LONG)
-    position_size: Union[int, float] = Field(default=0)
-    max_positions: int = Field(default=1)
     
     # Risk Management
-    stop_loss: float = Field(default=0.0)
-    take_profit: float = Field(default=0.0)
-    max_drawdown: float = Field(default=0.0)
-    
-    # Cost & Taxes
-    brokerage: float = Field(default=0.0)
-    slippage: float = Field(default=0.0)
-    taxes: TaxStructure = Field(default_factory=TaxStructure)
+    stop_loss: float = Field(default=0.0)  # In percentage
+    take_profit: float = Field(default=0.0)  # In percentage
     
     # Data Parameters
     timeframe: TimeFrame = Field(default=TimeFrame.DAILY)
@@ -76,16 +56,11 @@ class Trade(BaseModel):
     entry_price: float
     exit_date: Optional[datetime] = None
     exit_price: Optional[float] = None
-    position_type: PositionType
-    quantity: int
-    pnl: Optional[float] = None
-    costs: float
+    returns: Optional[float] = None  # Percentage returns
     status: str = "OPEN"
 
 class BacktestResult(BaseModel):
-    initial_capital: float
-    final_capital: float
-    total_profit_loss: float
+    total_returns: float  # Total percentage returns
     total_trades: int
     winning_trades: int
     losing_trades: int
@@ -94,26 +69,23 @@ class BacktestResult(BaseModel):
     sharpe_ratio: float
     sortino_ratio: float
     profit_factor: float
-    avg_profit_per_trade: float
-    avg_loss_per_trade: float
+    avg_return_per_trade: float
+    avg_winning_trade: float
+    avg_losing_trade: float
     risk_reward_ratio: float
     max_consecutive_wins: int
     max_consecutive_losses: int
     longest_winning_streak: int
     longest_losing_streak: int
     total_trading_days: int
-    position_holding_time: float
-    transaction_costs: float
+    avg_holding_time: float
     trades_history: List[Trade]
-    equity_curve: List[float]
+    equity_curve: List[float]  # Normalized to start at 100
     monthly_returns: Dict[str, float]
     yearly_returns: Dict[str, float]
-
-
+    
 def process_strategy_code(strategy_code: str) -> callable:
-    """
-    Process and validate strategy code from LLM
-    """
+    """Process and validate strategy code from LLM"""
     try:
         # Security check
         tree = ast.parse(strategy_code)
@@ -149,273 +121,297 @@ def process_strategy_code(strategy_code: str) -> callable:
     except Exception as e:
         raise ValueError(f"Strategy code processing failed: {str(e)}")
 
-def calculate_position_size(capital: float, price: float, params: BacktestParameters) -> int:
-    """
-    Calculate position size based on available capital
-    """
-    price = float(price.iloc[0] if isinstance(price, pd.Series) else price)
-    
-    if params.position_size > 0:
-        return min(
-            int(params.position_size),
-            int(capital / price)
-        )
-    else:
-        # Default to 100% of available capital
-        return int(capital / price)
-
-def calculate_transaction_costs(price: float, quantity: int, params: BacktestParameters) -> float:
-    """
-    Calculate total transaction costs including brokerage, taxes, and slippage
-    """
-    # Convert to float to ensure we're working with single values
-    price = float(price)
-    quantity = int(quantity)
-    
-    transaction_value = price * quantity
-    
-    # Brokerage
-    brokerage = min(float(transaction_value * params.brokerage), 20.0)  # Cap at ₹20
-    
-    # Securities Transaction Tax (STT)
-    stt = float(transaction_value * params.taxes.stt)
-    
-    # GST on brokerage
-    gst = float(brokerage * params.taxes.gst)
-    
-    # Stamp duty
-    stamp_duty = float(transaction_value * params.taxes.stamp_duty)
-    
-    # Slippage
-    slippage = float(transaction_value * params.slippage)
-    
-    return brokerage + stt + gst + stamp_duty + slippage
-
 def simulate_trades(
     data: pd.DataFrame,
     signals: pd.DataFrame,
     params: BacktestParameters
 ) -> Tuple[List[Trade], List[float]]:
-    """
-    Simulate trades based on signals and parameters
-    """
+    """Simulate trades based on signals and parameters"""
     trades: List[Trade] = []
-    available_capital = params.initial_capital
+    equity_curve = [100.0]  # Start at 100%
     current_position = None
-    equity_curve = [params.initial_capital]
+    current_equity = 100.0
     
     for timestamp, row in data.iterrows():
         current_signal = signals.loc[timestamp]
-        
-        # Skip if no signal
-        if float(current_signal['Signal'].iloc[0] if isinstance(current_signal['Signal'], pd.Series) else current_signal['Signal']) == 0:
-            continue
-            
         current_price = float(row['Close'].iloc[0] if isinstance(row['Close'], pd.Series) else row['Close'])
+        signal_value = float(current_signal['Signal'].iloc[0] if isinstance(current_signal['Signal'], pd.Series) else current_signal['Signal'])
         
-        # Check if we need to close existing position
+        # Handle existing position
         if current_position is not None:
+            # Calculate current returns
+            current_return = (current_price - current_position.entry_price) / current_position.entry_price * 100
+            
             # Check stop loss and take profit
-            if params.position_type == PositionType.LONG:
-                stop_hit = current_price <= current_position.entry_price * (1 - params.stop_loss)
-                profit_hit = current_price >= current_position.entry_price * (1 + params.take_profit)
-            else:
-                stop_hit = current_price >= current_position.entry_price * (1 + params.stop_loss)
-                profit_hit = current_price <= current_position.entry_price * (1 - params.take_profit)
-                
-            signal_value = float(current_signal['Signal'].iloc[0] if isinstance(current_signal['Signal'], pd.Series) else current_signal['Signal'])
+            stop_hit = current_return <= -params.stop_loss if params.stop_loss > 0 else False
+            profit_hit = current_return >= params.take_profit if params.take_profit > 0 else False
+            
+            # Close position if: stop loss hit, take profit hit, or sell signal
             if stop_hit or profit_hit or signal_value == -1:
-                # Close position
-                costs = calculate_transaction_costs(
-                    current_price,
-                    current_position.quantity,
-                    params
-                )
-                
-                pnl = (
-                    (current_price - current_position.entry_price)
-                    * current_position.quantity
-                    * (1 if params.position_type == PositionType.LONG else -1)
-                ) - costs
-                
                 current_position.exit_date = timestamp
                 current_position.exit_price = current_price
-                current_position.pnl = pnl
+                current_position.returns = current_return
                 current_position.status = "CLOSED"
                 
-                available_capital += (current_price * current_position.quantity) - costs
+                # Update equity
+                current_equity *= (1 + current_return/100)
                 trades.append(current_position)
                 current_position = None
-                equity_curve.append(available_capital)
+                equity_curve.append(current_equity)
         
-        # Open new position if we have signal and no current position
-        signal_value = float(current_signal['Signal'].iloc[0] if isinstance(current_signal['Signal'], pd.Series) else current_signal['Signal'])
-        if current_position is None and signal_value == 1:
-            quantity = calculate_position_size(available_capital, current_price, params)
-            
-            if quantity > 0:
-                costs = calculate_transaction_costs(current_price, quantity, params)
-                
-                current_position = Trade(
-                    entry_date=timestamp,
-                    entry_price=current_price,
-                    position_type=params.position_type,
-                    quantity=quantity,
-                    costs=costs
-                )
-                
-                available_capital -= (current_price * quantity + costs)
-                equity_curve.append(available_capital)
+        # Open new position if we have buy signal and no current position
+        elif signal_value == 1:
+            current_position = Trade(
+                entry_date=timestamp,
+                entry_price=current_price
+            )
+            equity_curve.append(current_equity)
     
     # Close any remaining position at the end
     if current_position is not None:
         last_price = float(data.iloc[-1]['Close'].iloc[0] if isinstance(data.iloc[-1]['Close'], pd.Series) else data.iloc[-1]['Close'])
-        costs = calculate_transaction_costs(
-            last_price,
-            current_position.quantity,
-            params
-        )
-        
-        pnl = (
-            (last_price - current_position.entry_price)
-            * current_position.quantity
-            * (1 if params.position_type == PositionType.LONG else -1)
-        ) - costs
+        final_return = (last_price - current_position.entry_price) / current_position.entry_price * 100
         
         current_position.exit_date = data.index[-1]
         current_position.exit_price = last_price
-        current_position.pnl = pnl
+        current_position.returns = final_return
         current_position.status = "CLOSED"
+        
+        current_equity *= (1 + final_return/100)
         trades.append(current_position)
-        equity_curve.append(available_capital + (last_price * current_position.quantity) - costs)
+        equity_curve.append(current_equity)
     
     return trades, equity_curve
+
 
 def calculate_metrics(
     trades: List[Trade],
     equity_curve: List[float],
     params: BacktestParameters
 ) -> BacktestResult:
-    """
-    Calculate performance metrics from trades
-    """
-    if not trades:
-        raise ValueError("No trades executed during backtest period")
+    """Calculate performance metrics from trades"""
+    try:
+        if not trades:
+            return BacktestResult(
+                total_returns=0.0,
+                total_trades=0,
+                winning_trades=0,
+                losing_trades=0,
+                win_rate=0.0,
+                max_drawdown=0.0,
+                sharpe_ratio=0.0,
+                sortino_ratio=0.0,
+                profit_factor=0.0,
+                avg_return_per_trade=0.0,
+                avg_winning_trade=0.0,
+                avg_losing_trade=0.0,
+                risk_reward_ratio=0.0,
+                max_consecutive_wins=0,
+                max_consecutive_losses=0,
+                longest_winning_streak=0,
+                longest_losing_streak=0,
+                total_trading_days=0,
+                avg_holding_time=0.0,
+                trades_history=[],
+                equity_curve=[100.0],
+                monthly_returns={},
+                yearly_returns={}
+            )
+            
+        # Basic metrics
+        total_trades = len(trades)
+        winning_trades = len([t for t in trades if t.returns > 0])
+        losing_trades = len([t for t in trades if t.returns < 0])
         
-    # Basic metrics
-    total_trades = len(trades)
-    winning_trades = len([t for t in trades if t.pnl > 0])
-    losing_trades = len([t for t in trades if t.pnl < 0])
-    
-    total_pnl = sum(t.pnl for t in trades)
-    total_costs = sum(t.costs for t in trades)
-    
-    # Calculate streaks
-    current_streak = 0
-    max_win_streak = 0
-    max_loss_streak = 0
-    
-    for trade in trades:
-        if trade.pnl > 0:
-            if current_streak > 0:
-                current_streak += 1
-            else:
-                current_streak = 1
-        else:
-            if current_streak < 0:
-                current_streak -= 1
-            else:
-                current_streak = -1
+        try:
+            total_returns = ((equity_curve[-1] - equity_curve[0]) / equity_curve[0]) * 100
+        except:
+            total_returns = 0.0
+        
+        try:
+            win_rate = winning_trades / total_trades if total_trades > 0 else 0.0
+        except:
+            win_rate = 0.0
+            
+        # Calculate streaks safely
+        try:
+            current_streak = 0
+            max_win_streak = 0
+            max_loss_streak = 0
+            
+            for trade in trades:
+                if trade.returns > 0:
+                    if current_streak > 0:
+                        current_streak += 1
+                    else:
+                        current_streak = 1
+                else:
+                    if current_streak < 0:
+                        current_streak -= 1
+                    else:
+                        current_streak = -1
+                        
+                max_win_streak = max(max_win_streak, current_streak if current_streak > 0 else 0)
+                max_loss_streak = min(max_loss_streak, current_streak if current_streak < 0 else 0)
+        except:
+            max_win_streak = 0
+            max_loss_streak = 0
+        
+        # Calculate returns series safely
+        try:
+            returns = np.diff(equity_curve) / equity_curve[:-1]
+        except:
+            returns = np.array([0.0])
+        
+        # Calculate monthly and yearly returns safely
+        try:
+            monthly_returns = {}
+            yearly_returns = {}
+            
+            for trade in trades:
+                month_key = trade.exit_date.strftime("%Y-%m")
+                year_key = trade.exit_date.strftime("%Y")
                 
-        max_win_streak = max(max_win_streak, current_streak if current_streak > 0 else 0)
-        max_loss_streak = min(max_loss_streak, current_streak if current_streak < 0 else 0)
-    
-    # Calculate returns
-    returns = np.diff(equity_curve) / equity_curve[:-1]
-    
-    # Calculate monthly and yearly returns
-    monthly_returns = {}
-    yearly_returns = {}
-    
-    for trade in trades:
-        month_key = trade.exit_date.strftime("%Y-%m")
-        year_key = trade.exit_date.strftime("%Y")
+                monthly_returns[month_key] = monthly_returns.get(month_key, 0) + trade.returns
+                yearly_returns[year_key] = yearly_returns.get(year_key, 0) + trade.returns
+        except:
+            monthly_returns = {}
+            yearly_returns = {}
         
-        monthly_returns[month_key] = monthly_returns.get(month_key, 0) + trade.pnl
-        yearly_returns[year_key] = yearly_returns.get(year_key, 0) + trade.pnl
-    
-    return BacktestResult(
-        initial_capital=params.initial_capital,
-        final_capital=equity_curve[-1],
-        total_profit_loss=total_pnl,
-        total_trades=total_trades,
-        winning_trades=winning_trades,
-        losing_trades=losing_trades,
-        win_rate=winning_trades / total_trades if total_trades > 0 else 0,
-        max_drawdown=calculate_max_drawdown(equity_curve),
-        sharpe_ratio=calculate_sharpe_ratio(returns),
-        sortino_ratio=calculate_sortino_ratio(returns),
-        profit_factor=calculate_profit_factor(trades),
-        avg_profit_per_trade=np.mean([t.pnl for t in trades if t.pnl > 0]) if winning_trades > 0 else 0,
-        avg_loss_per_trade=np.mean([t.pnl for t in trades if t.pnl < 0]) if losing_trades > 0 else 0,
-        risk_reward_ratio=calculate_risk_reward_ratio(trades),
-        max_consecutive_wins=max_win_streak,
-        max_consecutive_losses=abs(max_loss_streak),
-        longest_winning_streak=max_win_streak,
-        longest_losing_streak=abs(max_loss_streak),
-        total_trading_days=len(set(t.entry_date.date() for t in trades)),
-        position_holding_time=calculate_avg_holding_time(trades),
-        transaction_costs=total_costs,
-        trades_history=trades,
-        equity_curve=equity_curve,
-        monthly_returns=monthly_returns,
-        yearly_returns=yearly_returns
-    )
+        # Calculate metrics with error handling
+        try:
+            avg_return_per_trade = np.mean([t.returns for t in trades])
+        except:
+            avg_return_per_trade = 0.0
+            
+        try:
+            avg_winning_trade = np.mean([t.returns for t in trades if t.returns > 0]) if winning_trades > 0 else 0.0
+        except:
+            avg_winning_trade = 0.0
+            
+        try:
+            avg_losing_trade = np.mean([t.returns for t in trades if t.returns < 0]) if losing_trades > 0 else 0.0
+        except:
+            avg_losing_trade = 0.0
+        
+        return BacktestResult(
+            total_returns=total_returns,
+            total_trades=total_trades,
+            winning_trades=winning_trades,
+            losing_trades=losing_trades,
+            win_rate=win_rate,
+            max_drawdown=calculate_max_drawdown(equity_curve),
+            sharpe_ratio=calculate_sharpe_ratio(returns),
+            sortino_ratio=calculate_sortino_ratio(returns),
+            profit_factor=calculate_profit_factor(trades),
+            avg_return_per_trade=avg_return_per_trade,
+            avg_winning_trade=avg_winning_trade,
+            avg_losing_trade=avg_losing_trade,
+            risk_reward_ratio=calculate_risk_reward_ratio(trades),
+            max_consecutive_wins=max_win_streak,
+            max_consecutive_losses=abs(max_loss_streak),
+            longest_winning_streak=max_win_streak,
+            longest_losing_streak=abs(max_loss_streak),
+            total_trading_days=len(set(t.entry_date.date() for t in trades)),
+            avg_holding_time=calculate_avg_holding_time(trades),
+            trades_history=trades,
+            equity_curve=equity_curve,
+            monthly_returns=monthly_returns,
+            yearly_returns=yearly_returns
+        )
+    except Exception as e:
+        logger.error(f"Error calculating metrics: {str(e)}")
+        return BacktestResult(
+            total_returns=0.0,
+            total_trades=len(trades) if trades else 0,
+            winning_trades=0,
+            losing_trades=0,
+            win_rate=0.0,
+            max_drawdown=0.0,
+            sharpe_ratio=0.0,
+            sortino_ratio=0.0,
+            profit_factor=0.0,
+            avg_return_per_trade=0.0,
+            avg_winning_trade=0.0,
+            avg_losing_trade=0.0,
+            risk_reward_ratio=0.0,
+            max_consecutive_wins=0,
+            max_consecutive_losses=0,
+            longest_winning_streak=0,
+            longest_losing_streak=0,
+            total_trading_days=0,
+            avg_holding_time=0.0,
+            trades_history=trades if trades else [],
+            equity_curve=equity_curve if equity_curve else [100.0],
+            monthly_returns={},
+            yearly_returns={}
+        )
 
 def calculate_max_drawdown(equity_curve: List[float]) -> float:
     """Calculate maximum drawdown from equity curve"""
-    peak = equity_curve[0]
-    max_dd = 0
-    
-    for value in equity_curve:
-        if value > peak:
-            peak = value
-        dd = (peak - value) / peak
-        max_dd = max(max_dd, dd)
-    
-    return max_dd
+    try:
+        peak = equity_curve[0]
+        max_dd = 0
+        
+        for value in equity_curve:
+            if value > peak:
+                peak = value
+            dd = (peak - value) / peak * 100
+            max_dd = max(max_dd, dd)
+        
+        return max_dd
+    except:
+        return 0.0
 
 def calculate_sharpe_ratio(returns: np.ndarray, risk_free_rate: float = 0.05) -> float:
     """Calculate Sharpe ratio"""
-    if len(returns) < 2:
-        return 0
-    excess_returns = returns - risk_free_rate/252  # Daily risk-free rate
-    return np.mean(excess_returns) / np.std(excess_returns) * np.sqrt(252)
+    try:
+        if len(returns) < 2:
+            return 0.0
+        excess_returns = returns - risk_free_rate/252
+        return np.mean(excess_returns) / np.std(excess_returns) * np.sqrt(252)
+    except:
+        return 0.0
 
 def calculate_sortino_ratio(returns: np.ndarray, risk_free_rate: float = 0.05) -> float:
     """Calculate Sortino ratio"""
-    if len(returns) < 2:
-        return 0
-    excess_returns = returns - risk_free_rate/252
-    downside_returns = np.where(returns < 0, returns, 0)
-    return np.mean(excess_returns) / np.std(downside_returns) * np.sqrt(252)
+    try:
+        if len(returns) < 2:
+            return 0.0
+        excess_returns = returns - risk_free_rate/252
+        downside_returns = np.where(returns < 0, returns, 0)
+        if np.std(downside_returns) == 0:
+            return 0.0
+        return np.mean(excess_returns) / np.std(downside_returns) * np.sqrt(252)
+    except:
+        return 0.0
 
 def calculate_profit_factor(trades: List[Trade]) -> float:
     """Calculate profit factor"""
-    gross_profit = sum(t.pnl for t in trades if t.pnl > 0)
-    gross_loss = abs(sum(t.pnl for t in trades if t.pnl < 0))
-    return gross_profit / gross_loss if gross_loss != 0 else float('inf')
+    try:
+        total_gains = sum(t.returns for t in trades if t.returns > 0)
+        total_losses = abs(sum(t.returns for t in trades if t.returns < 0))
+        return total_gains / total_losses if total_losses != 0 else 0.0
+    except:
+        return 0.0
 
 def calculate_risk_reward_ratio(trades: List[Trade]) -> float:
     """Calculate risk/reward ratio"""
-    avg_profit = np.mean([t.pnl for t in trades if t.pnl > 0]) if any(t.pnl > 0 for t in trades) else 0
-    avg_loss = abs(np.mean([t.pnl for t in trades if t.pnl < 0])) if any(t.pnl < 0 for t in trades) else float('inf')
-    return avg_profit / avg_loss if avg_loss != 0 else float('inf')
+    try:
+        avg_gain = np.mean([t.returns for t in trades if t.returns > 0]) if any(t.returns > 0 for t in trades) else 0
+        avg_loss = abs(np.mean([t.returns for t in trades if t.returns < 0])) if any(t.returns < 0 for t in trades) else 0
+        return avg_gain / avg_loss if avg_loss != 0 else 0.0
+    except:
+        return 0.0
 
 def calculate_avg_holding_time(trades: List[Trade]) -> float:
     """Calculate average holding time in days"""
-    holding_times = [(t.exit_date - t.entry_date).total_seconds() / (24*3600) for t in trades]
-    return np.mean(holding_times) if holding_times else 0
+    try:
+        holding_times = [(t.exit_date - t.entry_date).total_seconds() / (24*3600) for t in trades]
+        return np.mean(holding_times) if holding_times else 0.0
+    except:
+        return 0.0
+
 
 def execute_backtesting(params: BacktestParameters) -> BacktestResult:
     """Main backtesting function"""
@@ -424,7 +420,15 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         data_loader = DataLoader()
         
         # Load historical data
-        data = data_loader.load_data(symbol=params.symbol, start_date=params.start_date, end_date=params.end_date, timeframe=params.timeframe.value)
+        data = data_loader.load_data(
+            symbol=params.symbol, 
+            start_date=params.start_date, 
+            end_date=params.end_date, 
+            timeframe=params.timeframe.value
+        )
+        
+        if data.empty:
+            raise ValueError("No historical data found for backtesting")
         
         # Process strategy code
         strategy = process_strategy_code(params.strategy_code)
@@ -433,9 +437,8 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         signals = strategy(data)
         
         # Validate signals DataFrame
-        required_columns = ['Signal']
-        if not all(col in signals.columns for col in required_columns):
-            raise ValueError(f"Strategy must return DataFrame with columns: {required_columns}")
+        if 'Signal' not in signals.columns:
+            raise ValueError("Strategy must return DataFrame with 'Signal' column")
         
         # Run simulation
         trades, equity_curve = simulate_trades(data, signals, params)
@@ -446,11 +449,13 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         return result
         
     except Exception as e:
+        logger.error(f"Backtesting failed: {str(e)}")
         raise Exception(f"Backtesting failed: {str(e)}")
     
-
-your_strategy_code1 = """
-import pandas as pd
+if __name__ == "__main__":
+    # Example usage
+    
+    your_strategy_code1 = """import pandas as pd
 import numpy as np
 import talib as ta
 
@@ -469,10 +474,10 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     signals['Signal'] = np.where(data['RSI'] > 70, -1, signals['Signal'])  # Sell when RSI above 70 (overbought)
     
     return signals
-"""
+    """
 
-# Corrected strategy_code2 (Bollinger Bands)
-your_strategy_code2 = """
+    # Corrected strategy_code2 (Bollinger Bands)
+    your_strategy_code2 = """
 import pandas as pd
 import numpy as np
 import talib as ta
@@ -505,10 +510,10 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     signals['Signal'] = signals['Signal'].fillna(0)
     
     return signals
-"""
+    """
 
-# Corrected strategy_code3 (Multiple Indicators)
-your_strategy_code3 = """
+    # Corrected strategy_code3 (Multiple Indicators)
+    your_strategy_code3 = """
 import pandas as pd
 import numpy as np
 import talib as ta
@@ -561,18 +566,16 @@ def generate_signals(data: pd.DataFrame) -> pd.DataFrame:
     signals['Signal'] = signals['Signal'].fillna(0)
     
     return signals
-"""
-    
-params = BacktestParameters(
-    symbol="RELIANCE",
-    strategy_code=your_strategy_code1,  # LLM generated code as string
-    start_date=datetime(2022, 1, 1),
-    end_date=datetime(2023, 12, 31),
-    initial_capital=100000,
-    position_type=PositionType.LONG,
-    stop_loss=0.02,  # 2%
-    take_profit=0.05,  # 5%
-)
+    """
+        
+    params = BacktestParameters(
+        symbol="RELIANCE",
+        strategy_code=your_strategy_code1,  # LLM generated code as string
+        start_date=datetime(2022, 1, 1),
+        end_date=datetime(2025, 3, 31),
+        stop_loss=0.03,  # 2%
+        take_profit=0.05,  # 5%
+    )
 
-result = execute_backtesting(params)
-print(result.model_dump_json())
+    result = execute_backtesting(params)
+    print(result.model_dump_json())

@@ -31,7 +31,6 @@ def get_stock_sid(symbol: str, exchange: str = "nse", force: bool = False) -> Op
             })
 
             if db_result:
-                logger.info(f"Found SID in database for {symbol}")
                 return db_result['sid']
 
         # If not in database, fetch from API
@@ -72,7 +71,8 @@ def get_stock_sid(symbol: str, exchange: str = "nse", force: bool = False) -> Op
 def get_corporate_announcements(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 1
 ) -> Optional[Dict]:
     """
     Get corporate announcements from MarketsMojo
@@ -95,7 +95,7 @@ def get_corporate_announcements(
                 "exchange": exchange.lower(),
                 "announcements": {"$exists": True},
                 "announcements_updated_at": {
-                    "$gte": datetime.now(pytz.UTC) - timedelta(hours=24)
+                    "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                 }
             })
 
@@ -213,7 +213,8 @@ def get_corporate_announcements(
 def get_stock_news(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 1
 ) -> Optional[Dict]:
     """
     Get stock news from MarketsMojo
@@ -235,7 +236,7 @@ def get_stock_news(
                     "exchange": exchange.lower(),
                     "news": {"$exists": True},
                     "news_updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(hours=24)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -308,7 +309,8 @@ def get_stock_news(
 def get_company_dashboard(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get company dashboard data from MarketsMojo
@@ -329,7 +331,7 @@ def get_company_dashboard(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(hours=24)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -418,7 +420,8 @@ def get_fundamental_data(
     page: int = 1,
     result_type: int = 0,  # 0: consolidated, 1: standalone
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get fundamental data from MarketsMojo
@@ -455,7 +458,7 @@ def get_fundamental_data(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     f"{period_type}.updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -554,7 +557,8 @@ def get_balance_sheet_data(
     exchange: str = "nse",
     page: int = 1,
     result_type: int = 0,  # 0: consolidated, 1: standalone
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get balance sheet data from MarketsMojo
@@ -581,7 +585,7 @@ def get_balance_sheet_data(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "balance_sheet.updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -681,7 +685,8 @@ def get_profit_loss_data(
     page: int = 1,
     exchange: str = "nse",
     result_type: int = 0,  # 0: consolidated, 1: standalone
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get profit & loss data from MarketsMojo
@@ -709,7 +714,7 @@ def get_profit_loss_data(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "profit_loss.updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -814,7 +819,8 @@ def get_cash_flow_data(
     page: int = 1,
     exchange: str = "nse",
     result_type: int = 0,  # 0: consolidated, 1: standalone
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get cash flow data from MarketsMojo
@@ -841,7 +847,7 @@ def get_cash_flow_data(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "cash_flow.updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -945,7 +951,8 @@ def get_cash_flow_data(
 def get_shareholding_pattern(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get shareholding pattern data from MarketsMojo
@@ -966,7 +973,7 @@ def get_shareholding_pattern(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "shareholding_pattern.updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -1059,7 +1066,8 @@ def get_shareholding_pattern(
 def get_stock_quality_ratios(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[Dict]:
     """
     Get stock quality and valuation ratios from MarketsMojo
@@ -1080,7 +1088,7 @@ def get_stock_quality_ratios(
                     "symbol": symbol,
                     "exchange": exchange.lower(),
                     "stock_quality.updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=1)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -1201,7 +1209,8 @@ def get_stock_quality_ratios(
 def get_company_peers(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    refresh_days: int = 7
 ) -> Optional[List[Dict]]:
     """
     Get company peers from MarketsMojo
@@ -1223,7 +1232,7 @@ def get_company_peers(
                     "exchange": exchange.lower(),
                     "peers": {"$exists": True},
                     "peers_updated_at": {
-                        "$gte": datetime.now(pytz.UTC) - timedelta(days=7)
+                        "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
                     }
                 }
             )
@@ -1427,6 +1436,103 @@ def get_price_movement(
         logger.error(f"Error processing price movement data for {symbol}: {str(e)}")
         return None
     
+def get_overall_fundamental_data(
+    symbol: str,
+    exchange: str = "nse",
+    force: bool = False,
+    refresh_days: int = 7
+) -> Optional[Dict]:
+    """
+    Get comprehensive fundamental data by calling all individual data functions
+    
+    Args:
+        symbol: Stock symbol (e.g., 'RELIANCE')
+        exchange: Exchange name ('nse' or 'bse')
+        force: Force fetch from API ignoring cache
+        
+    Returns:
+        Optional[Dict]: Complete fundamental data or None if critical error occurs
+    """
+    logger.info(f"Fetching overall fundamental data for {symbol}")
+    
+    try:
+        # First check if we have recent data in database
+        if not force:
+            db_result = db.fundamental_data.find_one({
+                "symbol": symbol,
+                "exchange": exchange.lower(),
+                "balance_sheet.updated_at": {
+                    "$gte": datetime.now(pytz.UTC) - timedelta(days=refresh_days)
+                }
+            })
+            
+            if db_result:
+                logger.info(f"Found recent fundamental data in database for {symbol}")
+                return db_result
+
+        get_fundamental_data(
+            symbol=symbol,
+            period="q",
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+        
+        get_fundamental_data(
+            symbol=symbol,
+            period="y",
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+
+        get_balance_sheet_data(
+            symbol=symbol,
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+
+        get_profit_loss_data(
+            symbol=symbol,
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+
+        get_cash_flow_data(
+            symbol=symbol,
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+
+        get_shareholding_pattern(
+            symbol=symbol,
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+
+        get_stock_quality_ratios(
+            symbol=symbol,
+            exchange=exchange,
+            force=force,
+            refresh_days=refresh_days
+        )
+
+        fundamental_data = db.fundamental_data.find_one({
+            "symbol": symbol,
+            "exchange": exchange.lower()
+        })
+
+        logger.info(f"Successfully compiled all fundamental data for {symbol}")
+        return fundamental_data
+
+    except Exception as e:
+        logger.error(f"Error fetching overall fundamental data for {symbol}: {str(e)}", exc_info=True)
+        return None
+    
 def test_company_data(symbol: str, sector: str):
     """Helper function to test all data fetching functions for a company"""
     print(f"\n{'='*80}")
@@ -1498,18 +1604,20 @@ if __name__ == "__main__":
     # Test companies from different sectors
     
     # IT Sector
-    test_company_data("TCS", "Information Technology")
+    # test_company_data("TCS", "Information Technology")
     
-    # Banking Sector
-    test_company_data("HDFCBANK", "Banking")
+    # # Banking Sector
+    # test_company_data("HDFCBANK", "Banking")
     
-    # Automotive Sector
-    test_company_data("TATAMOTORS", "Automotive")
+    # # Automotive Sector
+    # test_company_data("TATAMOTORS", "Automotive")
     
-    # FMCG Sector
-    test_company_data("HINDUNILVR", "FMCG")
+    # # FMCG Sector
+    # test_company_data("HINDUNILVR", "FMCG")
     
-    # Pharmaceutical Sector
-    test_company_data("SUNPHARMA", "Pharmaceuticals")
+    # # Pharmaceutical Sector
+    # test_company_data("SUNPHARMA", "Pharmaceuticals")
+    
+    get_overall_fundamental_data("RELIANCE", "nse")
  
     pass
