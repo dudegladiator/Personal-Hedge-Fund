@@ -10,6 +10,11 @@ from utils.app_logger import setup_logger
 logger = setup_logger("src/backtesting/technical_indicators.py")
 
 class TechnicalAnalysisValues(BaseModel):
+    close: float  # Current closing price
+    high: float  # Current high price
+    low: float  # Current low price
+    volume: float  # Current volume
+    
     # Trend Indicators
     sma_values: Dict[str, float]  # Current SMA values and slopes
     ema_values: Dict[str, float]  # Current EMA values and slopes
@@ -28,6 +33,19 @@ class TechnicalAnalysisValues(BaseModel):
     # Volatility Indicators
     bollinger_values: Dict[str, float]  # BB upper, middle, lower, bandwidth
     atr_values: Dict[str, float]  # ATR value and as % of price
+    
+def get_current_data(data: pd.DataFrame) -> Dict:
+    close = data['Close'].iloc[:, 0].values.astype(np.float64)
+    high = data['High'].iloc[:, 0].values.astype(np.float64)
+    low = data['Low'].iloc[:, 0].values.astype(np.float64)
+    volume = data['Volume'].iloc[:, 0].values.astype(np.float64)
+    
+    return {
+        "close": close[-1] if len(close) > 0 else np.nan,
+        "high": high[-1] if len(high) > 0 else np.nan,
+        "low": low[-1] if len(low) > 0 else np.nan,
+        "volume": volume[-1] if len(volume) > 0 else np.nan
+    }
 
 def analyze_trend_indicators(data: pd.DataFrame) -> Dict:
     """Return key trend indicator values"""
@@ -191,6 +209,7 @@ def get_basic_technical_indicators(
         data = data_loader.load_data(symbol, start_date, end_date, interval)
 
         # Analyze all indicator groups
+        current_data = get_current_data(data)
         trend_analysis = analyze_trend_indicators(data)
         momentum_analysis = analyze_momentum_indicators(data)
         volume_analysis = analyze_volume_indicators(data)
@@ -198,6 +217,7 @@ def get_basic_technical_indicators(
         
         logger.info(f"Successfully analyzed basic technical indicators for {symbol}")
         return TechnicalAnalysisValues(
+            **current_data,
             **trend_analysis,
             **momentum_analysis,
             **volume_analysis,

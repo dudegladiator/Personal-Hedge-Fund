@@ -9,6 +9,8 @@ from utils.app_logger import setup_logger
 from src.prompts import fundamental_agent_system_prompt
 import math
 
+from utils.llm import parse_fundamental_response
+
 logger = setup_logger("src/agents/fundamental_agent.py")
 
 MODEL_PROVIDER = "GEMINI"
@@ -642,7 +644,6 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         }
     ]
 
-    # Make the request to the LLM
     try:
         logger.info(f"Sending analysis results for {symbol} to LLM ({MODEL_PROVIDER} - {MODEL_NAME})...")
         chat_model = get_model(model_provider=MODEL_PROVIDER)
@@ -652,23 +653,15 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
             temperature=0.5, # Slightly lower temp for more factual summary
             response_format=FORMAT # Request JSON output
         )
-
-        llm_output = response.choices[0].message.content
         logger.info(f"Received LLM response for {symbol}.")
 
         # Attempt to parse the LLM output to ensure it's valid JSON
-        try:
-            json.loads(llm_output)
-            return llm_output
-        except json.JSONDecodeError as json_err:
-            logger.error(f"LLM output for {symbol} is not valid JSON: {json_err}\nOutput: {llm_output}")
-            # Fallback: return the raw string wrapped in a JSON structure
-            return json.dumps({"error": "LLM output was not valid JSON", "raw_output": llm_output})
-
+        analyse = parse_fundamental_response(response.choices[0].message.content)
+        return analyse
 
     except Exception as e:
         logger.error(f"Error interacting with LLM for {symbol}: {str(e)}", exc_info=True)
-        return json.dumps({"error": f"An error occurred during LLM interaction: {str(e)}"})
+        return {"error": f"An error occurred during LLM interaction: {str(e)}"}
 
 if __name__ == "__main__":
     # Use a common symbol for testing, ensure you have data for it
@@ -676,15 +669,4 @@ if __name__ == "__main__":
     symbol_to_test = "RELIANCE"
     print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
     analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=False, refresh_days=30) # Increase refresh days for testing
-    print("\n--- Analysis Report (JSON) ---")
     print(analysis_report_json)
-
-    # Pretty print if it's valid JSON
-    try:
-        parsed_report = json.loads(analysis_report_json)
-        print("\n--- Analysis Report (Formatted) ---")
-        print(json.dumps(parsed_report, indent=4))
-    except json.JSONDecodeError:
-        print("\n--- Analysis Report (Raw - Invalid JSON) ---")
-        print(analysis_report_json)
-    print("--- Agent Run Finished ---")

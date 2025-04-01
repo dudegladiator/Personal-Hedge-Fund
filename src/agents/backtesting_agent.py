@@ -4,12 +4,12 @@ from typing import Any, Dict
 from src.agents.sentimental_agent import get_recommendation_from_announcements, get_recommendation_from_news
 from src.backtesting.technical_indicators import get_basic_technical_indicators
 from src.data_source.market_apis import get_company_dashboard
-from utils.llm import parse_llm_response
 from src.llm.models import get_model
 from utils.app_logger import setup_logger
 from utils.config import get_sync_database
 from src.prompts import backtesting_strategy_system_prompt, backtesting_analysis_system_prompt, get_prompt_for_backtesting
 from src.backtesting.backtesting_engine import BacktestParameters, execute_backtesting
+from utils.llm import parse_backtesting_results
 
 logger = setup_logger("src/agents/backtesing_agent.py")
 db = get_sync_database()
@@ -20,20 +20,18 @@ MODEL_NAME = "gemini-2.0-flash"
 # MODEL_NAME = "llama-3.3-70b-versatile"
 FORMAT = { "type": "json_object" }
 
-def analyze_backtest_results(symbol: str, results: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_backtest_results(symbol, backtesting_results):
     logger.info(f"Starting backtest analysis for {symbol}")
     try:
-        prompt = f"""
-        Analyze the following backtesting results for {symbol} and provide detailed insights:
-        
-        {json.dumps(results, indent=2)}
-        
-        Provide analysis including:
-        1. Overall strategy performance
-        2. Risk metrics analysis
-        3. Trading statistics evaluation
-        4. Recommendations for improvement
-        """
+        prompt = f"""Analyze the following backtesting results for symbol: {symbol}.
+
+Please evaluate each strategy based on its performance metrics and provide a consolidated analysis. Follow the instructions and output format specified in the system prompt precisely.
+
+Backtesting Results Data:
+{backtesting_results}
+
+**Instruction Recap:** Output ONLY the final JSON object containing the executive_summary and detailed_analysis for each strategy.
+"""
         
         logger.debug("Sending analysis request to LLM")
         chat_model = get_model(model_provider=MODEL_PROVIDER)
@@ -46,11 +44,10 @@ def analyze_backtest_results(symbol: str, results: Dict[str, Any]) -> Dict[str, 
             temperature=0.6,
             response_format=FORMAT
         )
+        parsed_results = parse_backtesting_results(response_content=completion.choices[0].message.content)
         
-        analysis_result = json.loads(completion.choices[0].message.content)
         logger.info(f"Successfully analyzed backtest results for {symbol}")
-        logger.debug(f"Analysis result: {json.dumps(analysis_result, indent=2)}")
-        return analysis_result
+        return parsed_results
         
     except Exception as e:
         logger.error(f"Error analyzing backtest results for {symbol}: {str(e)}", exc_info=True)
@@ -110,7 +107,8 @@ def generate_strategy_code(symbol: str, exchange: str, force: bool = False):
 def backtesting_agent(
     symbol: str,
     exchange: str = "nse",
-    force: bool = False
+    force: bool = False,
+    backtesting_days: int = 365*10
 ) -> Dict[str, Any]:
     logger.info(f"Starting backtesting agent for {symbol}")
     try:
@@ -129,21 +127,11 @@ def backtesting_agent(
         for i, strategy_code in enumerate(strategy_response, 1):
             logger.info(f"Testing strategy {i} of {len(strategy_response)}")
             
-            try:
-                start_date = datetime.strptime(strategy_code.get("start_date"), "%Y-%m-%d")
-                end_date = datetime.strptime(strategy_code.get("end_date"), "%Y-%m-%d")
-            except:
-                # Fallback to default dates if conversion fails
-                start_date = datetime.now() - timedelta(days=365)
-                end_date = datetime.now()
-            
-            logger.debug(f"Backtesting strategy {i} with dates {start_date} to {end_date}")
-            
             params = BacktestParameters(
                 symbol=symbol,
                 strategy_code=strategy_code.get("strategy_code"),
-                start_date=strategy_code.get("start_date"),
-                end_date=strategy_code.get("end_date"),
+                start_date=datetime.now() - timedelta(days=backtesting_days),
+                end_date=datetime.now(),
                 stop_loss=0.05,
                 take_profit=0.05
             )
@@ -152,32 +140,19 @@ def backtesting_agent(
             logger.debug(f"Executing backtest for strategy {i}")
             backtest_results = execute_backtesting(params)
             
-            # Analyze results
-            # logger.debug(f"Analyzing results for strategy {i}")
-            # analysis = analyze_backtest_results(symbol, backtest_results.model_dump())
-            
             strategy_result = {
                 "strategy_number": i,
                 "strategy_name": strategy_code.get("strategy_name"),
                 "backtest_parameters": params.model_dump(),
                 "backtest_results": backtest_results.model_dump(),
-                # "analysis": analysis
             }
             
-            logger.debug(f"Strategy {i} results: {strategy_result}")
+            # logger.debug(f"Strategy {i} results: {strategy_result}")
             all_results.append(strategy_result)
-        
-        # Compile final results
-        final_results = {
-            "symbol": symbol,
-            "strategies": all_results,
-            "run_datetime": datetime.now().isoformat()
-        }
-        
-        logger.info(f"Successfully completed backtesting process for {symbol} "
-                   f"with {len(all_results)} strategies")
-        logger.debug(f"Final results: {final_results}")
-        return final_results
+            
+        analyse = analyze_backtest_results(symbol, all_results)
+        logger.info(f"Backtesting completed for {symbol}")
+        return analyse
         
     except Exception as e:
         error_msg = f"Backtesting failed for {symbol}: {str(e)}"

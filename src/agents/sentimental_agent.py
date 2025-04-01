@@ -4,7 +4,7 @@ from utils.app_logger import setup_logger
 from src.llm.models import get_model
 from datetime import datetime
 from src.prompts import announcements_system_prompt, news_system_prompt
-from utils.llm import parse_llm_response
+from utils.llm import parse_sentimental_response
 from utils.util import get_latest_announcements, get_latest_news
 
 logger = setup_logger("src/agents/sentimental_agent.py")
@@ -84,7 +84,7 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         )
         
         response_content = completion.choices[0].message.content
-        result = parse_llm_response(response_content)
+        result = parse_sentimental_response(response_content)
         result["run_datetime"] = datetime.now().isoformat()
         
         logger.info(f"Successfully generated announcement recommendation for {symbol}")
@@ -147,7 +147,7 @@ def get_recommendation_from_news(symbol, exchange="nse", past_days=5, force = Fa
         )
 
         response_content = completion.choices[0].message.content
-        result = parse_llm_response(response_content)
+        result = parse_sentimental_response(response_content)
         result["run_datetime"] = datetime.now().isoformat()
         
         logger.info(f"Successfully generated news recommendation for {symbol}")
