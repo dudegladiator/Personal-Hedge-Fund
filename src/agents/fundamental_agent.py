@@ -666,7 +666,7 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 if __name__ == "__main__":
     # Use a common symbol for testing, ensure you have data for it
     # or that get_overall_fundamental_data can fetch it.
-    symbol_to_test = "RELIANCE"
+    symbol_to_test = "IRCTC"
     print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
-    analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=False, refresh_days=30) # Increase refresh days for testing
+    analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
     print(analysis_report_json)

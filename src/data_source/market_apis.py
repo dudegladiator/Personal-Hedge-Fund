@@ -630,6 +630,9 @@ def get_balance_sheet_data(
         for i, period_date in enumerate(period_dates):
             period_metrics = {}
             
+            if period_date == '':
+                continue
+            
             # Process each row
             for row in raw_data:
                 key = row[0]
@@ -758,6 +761,9 @@ def get_profit_loss_data(
         # Process each period
         for i, period_date in enumerate(period_dates):
             period_metrics = {}
+            
+            if period_date == '':
+                continue
             
             # Process each row
             for row in raw_data:
@@ -1618,6 +1624,8 @@ if __name__ == "__main__":
     # # Pharmaceutical Sector
     # test_company_data("SUNPHARMA", "Pharmaceuticals")
     
-    get_overall_fundamental_data("RELIANCE", "nse")
+    # get_overall_fundamental_data("RELIANCE", "nse")
+    
+    print(get_balance_sheet_data("IRCTC", "nse"))
  
     pass
