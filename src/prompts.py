@@ -349,7 +349,11 @@ You will receive a JSON object from the user containing analysis results for a s
 {
   "executive_summary": {
     "overall_health_assessment_summary": "<Brief (1-2 sentence) overall assessment of the company's financial health, synthesizing all categories.>",
-    "overall_signal_recommendation": "<Analysis recommendation (strictly one of: 'BULLISH', 'BEARISH', 'NEUTRAL') based on the overall assessment>",
+    "overall_signal_recommendation": "<Analysis recommendation (strictly one of: 'BULLISH', 'BEARISH', 'NEUTRAL') determined through weighted multi-criteria analysis: 
+                                      - BULLISH if: (If there are more than or equal to three categories with "BULLISH/HEALTHY" signal with confidence > 55% for each category) OR (2 'Healthy' + 1 'Bullish' signal with no Bearish flags out of all the categories.)
+                                      - BEARISH if: (If there are more than or equal to two categories with "BEARISH" sign less than 50% for each category) OR (1 'Bearish' + 2 Neutral signal out of all the categories.)
+                                      - NEUTRAL otherwise. 
+                                      Prioritize stability/profitability signals 1.3x over others.>",
     "overall_signal_recommendation_confidence_pct": "<Your confidence level (%) in the overall signal recommendation>",
     "key_rationale": "<Concise bullet points summarizing the primary reasons (strengths/weaknesses derived from the analysis) supporting the recommendation. Link directly to specific ratio categories or signals. Max 3-4 points. Example: ['- Strong profitability metrics offset by high leverage.', '- Consistent operating efficiency and stability.']>"
   },
