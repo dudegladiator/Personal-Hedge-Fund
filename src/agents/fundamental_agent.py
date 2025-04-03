@@ -317,12 +317,11 @@ def compute_leverage_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
         results["Parameters"] = {k: v if v is not None else "N/A" for k, v in values.items()}
 
         # --- Z-Score Parameters ---
-        # Note: For ratios where lower is better, the 'type' is 'lower'.
         z_score_params = {
-            "Interest Coverage Ratio": {"mean": 4.0, "std_dev": 1.0, "type": "higher"}, # e.g., Ideal > 3-5
-            "Net Debt-to-Equity Avg": {"mean": 1.0, "std_dev": 0.5, "type": "lower"},  # e.g., Ideal < 0.5-1.5 (Lower is better)
-            "Debt-to-Asset Ratio": {"mean": 0.45, "std_dev": 0.15, "type": "lower"}, # e.g., Ideal < 0.3-0.6 (Lower is better)
-            "Financial Leverage Ratio": {"mean": 2.0, "std_dev": 0.5, "type": "range"} # e.g., Ideal around 1.5-2.5 (Range is okay)
+            "Interest Coverage Ratio": {"mean": 4.0, "std_dev": 1.0, "type": "higher"},
+            "Net Debt-to-Equity Avg": {"mean": 1.0, "std_dev": 0.5, "type": "lower"},
+            "Debt-to-Asset Ratio": {"mean": 0.45, "std_dev": 0.15, "type": "lower"},
+            "Financial Leverage Ratio": {"mean": 2.0, "std_dev": 0.5, "type": "range"}
         }
 
         # --- Scoring System ---
@@ -333,31 +332,46 @@ def compute_leverage_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
 
         for key, params in z_score_params.items():
             value = values.get(key)
-            # Special handling for D/E - if it's negative (meaning cash > debt), treat as very good (low leverage)
-            if key == "Net Debt-to-Equity Avg" and isinstance(value, (int, float)) and value < 0:
-                 z_score, points = None, 2 # Assign max points directly
-            else:
-                z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
+            z_score = None
+            points = 0  # Default points to 0 if value is None or handling fails
 
+            if value is not None:
+                # Special handling for Net Debt-to-Equity Avg with negative value
+                if key == "Net Debt-to-Equity Avg":
+                    if isinstance(value, (int, float)) and value < 0:
+                        points = 2
+                        z_score = "Negative (Good)"
+                    else:
+                        z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
+                else:
+                    z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
+            else:
+                # Value is None, ensure points are 0 and Z-score is marked N/A
+                z_score = "N/A"
+
+            # Ensure points are valid integers (handle cases where calculate_z_score_and_points might return None)
+            points = points if isinstance(points, (int, float)) else 0
             total_points += points
             max_points += 2
-            z_scores[key] = z_score if z_score is not None else ("N/A" if key != "Net Debt-to-Equity Avg" or value >= 0 else "Negative (Good)")
-            points_dict[key] = points
 
+            z_scores[key] = z_score
+            points_dict[key] = points
 
         results["Z-Scores"] = z_scores
         results["Points"] = points_dict
 
         # --- Calculate Confidence Level & Signal ---
-        confidence_level = round((total_points / max_points) * 100, 2) if max_points > 0 else 0
+        confidence_level = 0
+        if max_points > 0:
+            confidence_level = round((total_points / max_points) * 100, 2)
         results["Confidence Level (%)"] = confidence_level
 
         if confidence_level >= 75:
-            signal = "BULLISH" # Lower leverage generally viewed positively
+            signal = "BULLISH"
         elif confidence_level >= 45:
             signal = "HEALTHY"
         else:
-            signal = "BEARISH" # Higher leverage viewed negatively
+            signal = "BEARISH"
         results["Signal"] = signal
 
     except Exception as e:
@@ -666,7 +680,7 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 if __name__ == "__main__":
     # Use a common symbol for testing, ensure you have data for it
     # or that get_overall_fundamental_data can fetch it.
-    symbol_to_test = "REDINGTON"
+    symbol_to_test = "SBIN"
     print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
     analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=False, refresh_days=30) # Increase refresh days for testing
     print(analysis_report_json)
