@@ -280,7 +280,7 @@ def compute_leverage_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # --- Extract Values ---
         pbdit = latest_pl.get("operating_profit_(pbdit)")
-        depreciation = latest_pl.get("depreciation", 0) # Default depreciation to 0 if missing
+        depreciation = latest_pl.get("depreciation", 0)  # Default depreciation to 0 if missing
         interest = latest_pl.get("interest")
         # EBIT approximation
         ebit = pbdit - depreciation if pbdit is not None else None
@@ -310,7 +310,7 @@ def compute_leverage_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
 
         values = {
             "Interest Coverage Ratio": round(interest_coverage_ratio, 2) if interest_coverage_ratio is not None else None,
-            "Net Debt-to-Equity Avg": round(debt_to_equity, 2) if debt_to_equity is not None else None, # Renamed for clarity
+            "Net Debt-to-Equity Avg": round(debt_to_equity, 2) if debt_to_equity is not None else None,  # Renamed for clarity
             "Debt-to-Asset Ratio": round(debt_to_asset_ratio, 2) if debt_to_asset_ratio is not None else None,
             "Financial Leverage Ratio": round(financial_leverage_ratio, 2) if financial_leverage_ratio is not None else None
         }
