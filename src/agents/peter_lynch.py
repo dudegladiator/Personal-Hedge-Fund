@@ -179,9 +179,9 @@ def lynch_fundamentals(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
           else None)
 
         values = {
-            "Debt-to-Equity": round(de_ratio, 2),
-            "Operating Margin (%)": round(operating_margin, 2) if operating_margin is not None else None,
-            "FCF Margin (%)": round(fcf_margin, 2) if fcf_margin is not None else None
+            "Debt-to-Equity": de_ratio,
+            "Operating Margin (%)": operating_margin if operating_margin is not None else None,
+            "FCF Margin (%)": fcf_margin if fcf_margin is not None else None
         }
         results["Parameters"] = {k: v if v is not None else "N/A" for k, v in values.items()}
 
@@ -440,7 +440,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
     Returns:
         JSON string containing the analysis report from the LLM or an error message.
     """
-    logger.info(f"Starting fundamental agent for {symbol} on {exchange}...")
+    logger.info(f"Starting peter lynch agent for {symbol} on {exchange}...")
     # Get fundamental data from database
     fundamental_data = get_overall_fundamental_data(symbol=symbol, exchange=exchange, force=force, refresh_days=refresh_days)
 
@@ -471,7 +471,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         },
         {
             "role": "user",
-            "content": f"Please perform a comprehensive fundamental analysis for {symbol} based on the following calculated metrics (including parameters, Z-scores relative to typical ranges, points awarded [0-2], confidence levels, and signals). Provide a summary of the company's financial health across operating efficiency, profitability, leverage, and stability. Conclude with an overall investment recommendation (e.g., BULLISH, BEARISH, NEUTRAL) and rationale. Ensure the final output is a single JSON object.\n\nAnalysis Metrics:\n{json.dumps(filtered_results, indent=2)}"
+            "content": f"Please perform a comprehensive fundamental analysis for {symbol} based on the following calculated metrics (including parameters, Z-scores relative to typical ranges, points awarded [0-2], confidence levels, and signals). Provide a summary of the company's financial health across all component of peter lynch's evaluation (growth, fundamental, valuation). Conclude with an overall investment recommendation (e.g., BULLISH, BEARISH, NEUTRAL) and rationale. Ensure the final output is a single JSON object.\n\nAnalysis Metrics:\n{json.dumps(filtered_results, indent=2)}"
         }
     ]
 
@@ -497,7 +497,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 if __name__ == "__main__":
     # Use a common symbol for testing, ensure you have data for it
     # or that get_overall_fundamental_data can fetch it.
-    symbol_to_test = "RELIANCE"
-    print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
+    symbol_to_test = "REDINGTON"
+    print(f"--- Running Peter Lynch Agent for {symbol_to_test} ---")
     analysis_report_json = peter_lynch_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
     print(analysis_report_json)
