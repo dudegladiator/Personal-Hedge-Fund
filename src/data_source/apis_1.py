@@ -40,7 +40,7 @@ def get_live_price(symbol: str, exchange: str = "NSE") -> Optional[Dict]:
         }
         
         
-        logger.info(f"Successfully fetched and stored live price for {symbol}")
+        logger.info(f"Successfully fetched live price for {symbol}")
         return live_price
         
     except requests.RequestException as e:

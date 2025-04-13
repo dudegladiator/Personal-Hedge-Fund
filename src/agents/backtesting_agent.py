@@ -3,7 +3,7 @@ import json
 from typing import Any, Dict
 from src.agents.sentimental_agent import get_recommendation_from_announcements, get_recommendation_from_news
 from src.backtesting.technical_indicators import get_basic_technical_indicators
-from src.data_source.market_apis import get_company_dashboard
+from src.data_source.apis_2 import get_company_dashboard
 from src.llm.models import get_model
 from utils.app_logger import setup_logger
 from utils.config import get_sync_database

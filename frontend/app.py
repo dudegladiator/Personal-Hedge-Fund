@@ -4,14 +4,16 @@ import numpy as np
 import time
 import random
 import uuid
-from datetime import datetime
-import hashlib 
+from datetime import datetime, timedelta
 import os
 import json
+from streamlit_cookies_manager import EncryptedCookieManager
 
-from src.data_source.market_apis import get_live_indices_pricing
-from src.data_source.ticker_tape_apis import get_tickertape_movers, search_tickertape_stocks
+from src.data_source.apis_1 import get_live_price
+from src.data_source.apis_2 import get_live_indices_pricing
+from src.data_source.apis_3 import get_tickertape_movers, search_tickertape_stocks
 from src.routers.auth import authenticate_user
+from src.routers.trading import add_funds_to_portfolio, execute_paper_trade, get_detailed_paper_portfolio, get_paper_portfolio, get_paper_transactions
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -28,6 +30,8 @@ PAGE_DASHBOARD = "dashboard"
 PAGE_NEW_ANALYSIS = "new_analysis"
 PAGE_JOB_STATUS = "job_status"
 PAGE_PAPER_TRADE = "paper_trade" # New Paper Trading Page
+LOGIN_COOKIE_NAME = "ai_hedge_fund_user_session" # Choose a name
+COOKIE_EXPIRY_DAYS = 7 # How long the login persists
 
 # Job Statuses
 STATUS_PENDING = "⏳ Pending"
@@ -54,18 +58,27 @@ ANALYSIS_STEPS = [
     STEP_COMPLETE,
 ]
 
+# --- Initialize Cookie Manager ---
+# IMPORTANT: Set a secret password. Use environment variables or secrets management for production.
+cookie_password = os.environ.get("STREAMLIT_COOKIE_PASSWORD", "admin")
+# Use EncryptedCookieManager for better security than plain CookieManager
+cookies = EncryptedCookieManager(
+    password=cookie_password, # Must be set!
+    prefix="ai_hedge_fund/",
+)
+if not cookies.ready():
+    # Wait for cookie manager hydration
+    st.spinner("Loading session...")
+    st.stop()
+
 # --- File Paths for Persistent Data ---
 DATA_DIR = "data" # Store data in a sub-directory
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
 JOBS_FILE = os.path.join(DATA_DIR, "jobs_data.json")
-PAPER_PORTFOLIOS_FILE = os.path.join(DATA_DIR, "paper_portfolios.json") # New file
 
 # --- Ensure Data Directory Exists ---
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Manage jobs and portfolios manually for modification
 _persistent_jobs_data = None
-_persistent_paper_portfolios = None
 
 def load_jobs_data():
     """Loads the entire jobs data structure from the JSON file."""
@@ -94,38 +107,17 @@ def save_jobs_data():
             json.dump(_persistent_jobs_data, f, indent=4, default=convert_datetime)
     except (IOError, TypeError) as e: st.error(f"Error saving jobs data: {e}")
 
-def load_paper_portfolios():
-    """Loads paper portfolio data from the JSON file."""
-    global _persistent_paper_portfolios
-    if _persistent_paper_portfolios is None:
-        try:
-            with open(PAPER_PORTFOLIOS_FILE, 'r') as f:
-                _persistent_paper_portfolios = json.load(f)
-                if not isinstance(_persistent_paper_portfolios, dict): _persistent_paper_portfolios = {}
-        except (FileNotFoundError, json.JSONDecodeError):
-            _persistent_paper_portfolios = {}
-    return _persistent_paper_portfolios
-
-def save_paper_portfolios():
-    """Saves the current state of paper portfolios to the JSON file."""
-    global _persistent_paper_portfolios
-    if _persistent_paper_portfolios is None: return
-    try:
-        # Datetimes in history should already be ISO strings
-        with open(PAPER_PORTFOLIOS_FILE, 'w') as f:
-            json.dump(_persistent_paper_portfolios, f, indent=4)
-    except IOError as e: st.error(f"Error saving paper portfolio data: {e}")
-
 # --- Initialize Persistent Data on App Start ---
 load_jobs_data()
-load_paper_portfolios()
 
-# --- Session State Initialization ---
 # --- Session State Initialization ---
 def initialize_session():
     """Initializes session state variables."""
     if 'logged_in_user' not in st.session_state:
-        st.session_state.logged_in_user = None
+        if cookies.get(LOGIN_COOKIE_NAME) is not None and cookies.get(LOGIN_COOKIE_NAME) != "logout":
+            st.session_state.logged_in_user = cookies.get(LOGIN_COOKIE_NAME)
+        else:
+            st.session_state.logged_in_user = None
     if 'current_page' not in st.session_state:
         st.session_state.current_page = PAGE_LOGIN
     if 'selected_job_id' not in st.session_state:
@@ -171,86 +163,6 @@ def create_new_job(username, inputs):
     save_job(username, job_id, job_data)
     return job_id
 
-# --- Paper Portfolio Helper Functions ---
-
-def get_paper_portfolio(username):
-    """Gets the paper portfolio for a user, creating if it doesn't exist."""
-    portfolios = load_paper_portfolios()
-    if username not in portfolios:
-        portfolios[username] = {
-            "cash": 100000.00, "holdings": [], "history": [],
-            "last_simulated_update": datetime.min.isoformat() # Start with min date
-        }
-        global _persistent_paper_portfolios
-        _persistent_paper_portfolios = portfolios
-        save_paper_portfolios()
-    # Ensure essential keys exist even if loaded from file
-    portfolio = portfolios[username]
-    portfolio.setdefault("cash", 0.0)
-    portfolio.setdefault("holdings", [])
-    portfolio.setdefault("history", [])
-    portfolio.setdefault("last_simulated_update", datetime.min.isoformat())
-    return portfolio
-
-def update_paper_portfolio(username, portfolio_data):
-    """Updates and saves the paper portfolio for a user."""
-    global _persistent_paper_portfolios
-    if _persistent_paper_portfolios is None: _persistent_paper_portfolios = load_paper_portfolios()
-    _persistent_paper_portfolios[username] = portfolio_data
-    save_paper_portfolios()
-
-# --- Simulation Functions ---
-# Keep simulation functions simple for the demo
-
-_simulated_prices = {} # Cache simulated prices within a run
-
-def get_simulated_price(ticker):
-    """Gets a simulated 'current' price for a ticker."""
-    if ticker not in _simulated_prices:
-        # Base price on ticker hash for some consistency, add randomness
-        base = int(hashlib.sha1(ticker.encode()).hexdigest(), 16) % 500 + 10 # Base price 10-510
-        _simulated_prices[ticker] = round(base * random.uniform(0.9, 1.1), 2)
-    # Add slight fluctuation on subsequent calls within the same run
-    _simulated_prices[ticker] *= random.uniform(0.998, 1.002)
-    return round(max(0.01, _simulated_prices[ticker]), 2) # Ensure price is positive
-
-def simulate_portfolio_performance(portfolio):
-    """Very basic simulation of daily performance change."""
-    try:
-        last_update = datetime.fromisoformat(portfolio.get("last_simulated_update", datetime.min.isoformat()))
-    except ValueError:
-        last_update = datetime.min # Handle invalid format
-
-    # Simulate only if enough time has passed (e.g., > 4 hours)
-    if (datetime.now() - last_update).total_seconds() < 3600 * 4:
-        return portfolio
-
-    current_holdings_value = 0.0
-    for holding in portfolio.get("holdings", []):
-        current_price = get_simulated_price(holding['ticker']) # Use simulated price
-        current_holdings_value += holding.get("quantity", 0) * current_price
-
-    # Calculate old value based on *average cost* for comparison
-    old_holdings_value = sum(h['quantity'] * h['avg_cost'] for h in portfolio.get("holdings", []))
-    old_total_value = portfolio.get("cash", 0.0) + old_holdings_value
-
-    # New total value based on *current simulated prices*
-    new_total_value = portfolio.get("cash", 0.0) + current_holdings_value
-
-    # Calculate the change and adjust cash (simple way to reflect value change)
-    value_diff = new_total_value - old_total_value
-    portfolio["cash"] = portfolio.get("cash", 0.0) + value_diff
-    portfolio["last_simulated_update"] = datetime.now().isoformat()
-
-    if abs(value_diff) > 0.01: # Log only if there's a noticeable change
-        portfolio.setdefault("history", []).append({
-            "timestamp": datetime.now().isoformat(),
-            "action": "SIM_PERF",
-            "details": {"simulated_value_change": round(value_diff, 2), "new_cash_value": round(portfolio["cash"], 2)}
-        })
-
-    return portfolio
-
 # --- Authentication ---
 
 def check_login():
@@ -272,7 +184,14 @@ def check_login():
                 # Clear any leftover proposed trades from previous sessions/users
                 st.session_state.proposed_trades = None
                 st.session_state.reviewed_trades = None
-                st.rerun()
+                # --- SET COOKIE ---
+                cookies[LOGIN_COOKIE_NAME] = username
+                cookies.save()
+                # --- End SET COOKIE ---
+
+                st.success(f"Welcome, {username}!") # Show feedback before rerun
+                time.sleep(0.5) # Short delay for user to see message
+                st.rerun() # Rerun to show the main app UI
             else:
                 st.error("Invalid username or password.")
 
@@ -306,6 +225,12 @@ def display_sidebar():
     st.sidebar.button("🚪 Logout", on_click=logout, use_container_width=True)
 
 def logout():
+    if LOGIN_COOKIE_NAME in cookies: # Check if the cookie exists before deleting
+        cookies[LOGIN_COOKIE_NAME]  = "logout"
+        cookies.save() # Save the changes
+        print(f"Deleted cookie: {LOGIN_COOKIE_NAME}") # Optional: for debugging
+    else:
+        print(f"Cookie {LOGIN_COOKIE_NAME} not found to delete.") # Optional: for debugging
     keys_to_clear = ['logged_in_user', 'selected_job_id', 'current_page', 'proposed_trades', 'reviewed_trades']
     for key in keys_to_clear:
         if key in st.session_state: del st.session_state[key]
@@ -643,9 +568,9 @@ def render_new_analysis():
     st.title("➕ Start New Portfolio Analysis")
     st.markdown("Define your investment parameters, and the AI will generate portfolio options.")
     with st.form("new_analysis_form"):
-        instructions = st.text_area("**Instructions:**", height=150, placeholder="e.g., Invest $50k...")
+        instructions = st.text_area("**Instructions:**", height=150, placeholder="e.g., Invest ₹50k...")
         with st.expander("Advanced Filters (Optional)"):
-            budget = st.number_input("Budget ($)", min_value=1000, value=25000, step=1000, format="%d")
+            budget = st.number_input("Budget (₹)", min_value=1000, value=25000, step=1000, format="%d")
             risk_score = st.slider("Risk Score (1-100)", 1, 100, 60)
             sectors = st.multiselect("Sectors", ["Tech", "Health", "Finance", "Energy", "Industrials", "Utilities", "Consumer", "Materials"])
             market_caps = st.multiselect("Market Cap", ["Small", "Mid", "Large"], default=["Mid", "Large"])
@@ -898,14 +823,14 @@ def render_job_status():
                     st.caption(f"{stock_info.get('Strategy Description', '')}")
                     col1, col2, col3, col4 = st.columns(4)
                     col1.metric("Allocation", f"{alloc_percent:.2f}%")
-                    col2.metric("Amount", f"${amount:,.2f}")
+                    col2.metric("Amount", f"₹{amount:,.2f}")
                     col3.metric("Exp. Ann. Return", f"{stock_info.get('Annualized Return (%)', 0.0):.2f}%")
                     col4.metric("Exp. Sharpe Ratio", f"{stock_info.get('Sharpe Ratio', 0.0):.2f}")
             st.markdown("---")
             st.subheader("Portfolio Summary")
             summary_col1, summary_col2 = st.columns(2)
-            summary_col1.metric("Target Budget", f"${budget:,.2f}")
-            summary_col2.metric("Total Allocated", f"${total_allocated_amount:,.2f}")
+            summary_col1.metric("Target Budget", f"₹{budget:,.2f}")
+            summary_col2.metric("Total Allocated", f"₹{total_allocated_amount:,.2f}")
             st.caption(f"Based on Risk Score: {inputs.get('risk_score', 'N/A')}/100")
 
             # --- Modified Paper Trade Button Action ---
@@ -931,44 +856,6 @@ def render_job_status():
 
     if rerun_needed: st.rerun()
 
-def execute_paper_trade(username, action, ticker, quantity=None, amount=None):
-    """Executes a buy or sell paper trade."""
-    portfolio = get_paper_portfolio(username)
-    current_price = get_simulated_price(ticker)
-    if current_price <= 0: return False, "Invalid simulated price."
-
-    if action == "Buy":
-        if amount is None or amount <= 0: return False, "Invalid amount."
-        if portfolio["cash"] < amount: return False, "Insufficient cash."
-        quantity_to_buy = amount / current_price
-        portfolio["cash"] -= amount
-        existing_holding = next((h for h in portfolio["holdings"] if h["ticker"] == ticker), None)
-        if existing_holding:
-            new_total_qty = existing_holding["quantity"] + quantity_to_buy
-            new_total_cost = (existing_holding["avg_cost"] * existing_holding["quantity"]) + amount
-            existing_holding["avg_cost"] = new_total_cost / new_total_qty
-            existing_holding["quantity"] = new_total_qty
-        else:
-            portfolio["holdings"].append({"ticker": ticker, "quantity": quantity_to_buy, "avg_cost": current_price})
-        portfolio["history"].append({"timestamp": datetime.now().isoformat(), "action": "BUY", "details": {"ticker": ticker, "quantity": round(quantity_to_buy, 4), "price": current_price, "cost": round(amount, 2)}})
-        update_paper_portfolio(username, portfolio)
-        return True, f"Bought {quantity_to_buy:.4f} shares of {ticker}."
-
-    elif action == "Sell":
-        if quantity is None or quantity <= 0: return False, "Invalid quantity."
-        holding = next((h for h in portfolio["holdings"] if h["ticker"] == ticker), None)
-        if not holding: return False, f"No holdings found for {ticker}."
-        if quantity > holding["quantity"]: return False, "Cannot sell more than held."
-        proceeds = quantity * current_price
-        portfolio["cash"] += proceeds
-        holding["quantity"] -= quantity
-        if holding["quantity"] < 0.0001: portfolio["holdings"] = [h for h in portfolio["holdings"] if h["ticker"] != ticker]
-        portfolio["history"].append({"timestamp": datetime.now().isoformat(), "action": "SELL", "details": {"ticker": ticker, "quantity": round(quantity, 4), "price": current_price, "proceeds": round(proceeds, 2)}})
-        update_paper_portfolio(username, portfolio)
-        return True, f"Sold {quantity:.4f} shares of {ticker}."
-    else:
-        return False, "Invalid action."
-
 def render_stock_details_popup(stock_data: dict):
     ticker = stock_data.get('Ticker', 'N/A')
     current_price = stock_data.get('Price', 0.0)
@@ -991,34 +878,78 @@ def render_stock_details_popup(stock_data: dict):
 
     col2.metric("Day's Change", f"{day_change_pct:+.2f}%", delta_color=delta_color)
     
+    # Paper Trade Button
     st.subheader("Paper Trade Actions")
-    action = st.radio("Action", ["Buy", "Sell"], horizontal=True, key=f"action_{ticker}")
-
     username = st.session_state.logged_in_user
-    portfolio = get_paper_portfolio(username) # Needed for sell validation
 
-    with st.form(key=f"trade_form_{ticker}"):
+    # --- Move Radio Button OUTSIDE the form ---
+    action = st.radio(
+        "Action",
+        ["Buy", "Sell"],
+        horizontal=True,
+        key=f"action_{ticker}_popup" # Key remains the same
+    )
+
+    # Fetch portfolio only if 'Sell' is selected, needed for validation later
+    portfolio_for_validation = None
+    if action == "Sell":
+        portfolio_for_validation = get_paper_portfolio(username) # Backend basic fetch
+
+    # --- Form now only contains the relevant input and button ---
+    with st.form(key=f"trade_form_{ticker}_popup"): # Form key remains the same
         if action == "Buy":
-            buy_amount = st.number_input("Amount to Invest ($)", min_value=1.0, value=100.0, step=10.0, key=f"buy_amount_{ticker}", help="Amount of cash to spend.")
-            trade_qty = None # Quantity determined by amount/price
-        else: # Sell
-            holding = next((h for h in portfolio.get("holdings", []) if h["ticker"] == ticker), None)
+            trade_qty = st.number_input(
+                "Quantity to Buy", min_value=1, value=1, step=1,
+                key=f"buy_qty_{ticker}_popup", # Key for input remains the same
+                format="%d"
+            )
+        else: # Sell action selected
+            holding = None
+            if portfolio_for_validation and not portfolio_for_validation.get("error"):
+                holding = next((h for h in portfolio_for_validation.get("holdings", []) if h["ticker"] == ticker), None)
             max_sell_qty = holding['quantity'] if holding else 0.0
-            trade_qty = st.number_input(f"Quantity to Sell (Max: {max_sell_qty:.4f})", min_value=0.0, max_value=max_sell_qty, value=0.0, step=0.0001, key=f"sell_qty_{ticker}", format="%.4f")
-            buy_amount = None # Amount determined by qty*price
+            max_sell_qty_int = int(max_sell_qty) if max_sell_qty else 0
+
+            trade_qty = st.number_input(
+                f"Quantity to Sell (Max: {max_sell_qty_int})", min_value=0, max_value=max_sell_qty_int,
+                value=0, step=1, key=f"sell_qty_{ticker}_popup", # Key for input remains the same
+                format="%d"
+            )
 
         trade_submitted = st.form_submit_button(f"Execute Paper {action}")
 
         if trade_submitted:
-            success, message = execute_paper_trade(username, action, ticker, quantity=trade_qty, amount=buy_amount)
-            if success:
-                st.success(message)
-                # Clear price cache to get potentially new price on rerun
-                global _simulated_prices
-                if ticker in _simulated_prices: del _simulated_prices[ticker]
-                st.rerun()
-            else:
-                st.error(message)
+            try:
+                final_trade_qty = int(trade_qty)
+                # --- Validation ---
+                if final_trade_qty <= 0 and action == "Buy":
+                    st.warning("Buy quantity must be at least 1.")
+                elif final_trade_qty < 0:
+                    st.warning("Quantity cannot be negative.")
+                # Fetch fresh portfolio data right before Sell validation inside submission logic
+                elif action == "Sell":
+                     portfolio_now = get_paper_portfolio(username) # Fetch fresh data
+                     holding_now = next((h for h in portfolio_now.get("holdings", []) if h["ticker"] == ticker), None)
+                     max_sell_now = int(holding_now['quantity']) if holding_now else 0
+                     if final_trade_qty > max_sell_now:
+                          st.warning(f"Cannot sell {final_trade_qty} shares. You now hold {max_sell_now}.")
+                     else: # Quantity is valid for sell (or buy)
+                          success, message = execute_paper_trade(username, action, ticker, quantity=final_trade_qty)
+                          if success:
+                              st.success(message)
+                              st.rerun()
+                          else:
+                              st.error(message)
+                else: # Buy action with valid quantity
+                     success, message = execute_paper_trade(username, action, ticker, quantity=final_trade_qty)
+                     if success:
+                         st.success(message)
+                         st.rerun()
+                     else:
+                         st.error(message)
+
+            except (ValueError, TypeError):
+                 st.error("Invalid quantity entered. Please enter a whole number.")
 
 def render_home():
     st.title("📈 Market Overview")
@@ -1096,7 +1027,6 @@ def render_home():
                     s_col2.markdown(f"<span style='color:{color}; font-weight:bold;'>{change_pct:+.2f}%</span>", unsafe_allow_html=True)
                     # Add expander for details/trade
                     with st.expander("Details / Trade"):
-                        # Prepare stock_data dict needed by render_stock_details_popup
                         # It needs 'Price' and 'Change %' (which is 'Change' in its context)
                         # We don't have 'Cap' from search, so it will be omitted
                         popup_stock_data = {
@@ -1140,7 +1070,7 @@ def render_home():
             with st.container(border=True):
                 s_col1, s_col2 = st.columns([3, 1])
                 s_col1.markdown(f"**{stock['Ticker']}** ({stock['Cap']})")
-                s_col1.caption(f"Price: ${stock['Price']:.2f}")
+                s_col1.caption(f"Price: ₹{stock['Price']:.2f}")
                 s_col2.markdown(f"<span style='color:green; font-weight:bold;'>+{stock['Change']:.1f}%</span>", unsafe_allow_html=True)
                 with st.expander("Details / Trade"):
                      render_stock_details_popup(stock)
@@ -1151,7 +1081,7 @@ def render_home():
              with st.container(border=True):
                 s_col1, s_col2 = st.columns([3, 1])
                 s_col1.markdown(f"**{stock['Ticker']}** ({stock['Cap']})")
-                s_col1.caption(f"Price: ${stock['Price']:.2f}")
+                s_col1.caption(f"Price: ₹{stock['Price']:.2f}")
                 s_col2.markdown(f"<span style='color:red; font-weight:bold;'>{stock['Change']:.1f}%</span>", unsafe_allow_html=True)
                 with st.expander("Details / Trade"):
                      render_stock_details_popup(stock)
@@ -1160,181 +1090,317 @@ def render_home():
 def render_paper_trade():
     st.title("📄 Paper Trading Portfolio")
     username = st.session_state.logged_in_user
-    portfolio = get_paper_portfolio(username)
-
-    # Simulate performance update on page load
-    portfolio = simulate_portfolio_performance(portfolio)
-    update_paper_portfolio(username, portfolio) # Save potential simulation changes
+    portfolio_details = get_detailed_paper_portfolio(username) # Use new function
+    
+    # Check for portfolio fetch error
+    if portfolio_details.get("error"):
+        st.error(f"Error loading portfolio: {portfolio_details['error']}")
+        return # Stop rendering if portfolio fails
 
     # --- Add Funds Section ---
     with st.expander("💰 Add Funds"):
         with st.form("add_funds_form"):
-            amount_to_add = st.number_input("Amount ($)", min_value=0.01, value=1000.0, step=100.0)
+            # Use '₹' symbol for currency
+            amount_to_add = st.number_input("Amount (₹)", min_value=0.01, value=1000.0, step=100.0)
             add_funds_submitted = st.form_submit_button("Add Funds to Cash Balance")
             if add_funds_submitted:
-                portfolio["cash"] += amount_to_add
-                portfolio["history"].append({
-                    "timestamp": datetime.now().isoformat(),
-                    "action": "ADD_FUNDS",
-                    "details": {"amount": round(amount_to_add, 2)}
-                })
-                update_paper_portfolio(username, portfolio)
-                st.success(f"Successfully added ${amount_to_add:,.2f} to cash balance.")
-                st.rerun() # Rerun to update displayed balances
+                # Call the new backend function
+                success, message = add_funds_to_portfolio(username, amount_to_add)
+                if success:
+                    st.success(message)
+                    st.rerun() # Rerun to update displayed balances
+                else:
+                    st.error(message)
 
-    # --- Proposed Trades Section (if applicable) ---
+    # --- Proposed Trades Section (Logic remains similar, but uses execute_paper_trade from trading.py) ---
     if 'proposed_trades' in st.session_state and st.session_state.proposed_trades:
         st.subheader("📝 Review Proposed Trades from AI Analysis")
-        st.caption("Review and adjust the target amounts for the portfolio suggested by the AI analysis. The system will calculate quantities based on simulated current prices.")
+        st.caption("AI analysis suggests target amounts. Quantities are calculated based on current prices. Review and adjust quantities before execution.")
 
-        proposed_df = pd.DataFrame(st.session_state.proposed_trades)
+        # Initial calculation (no change needed here, still needs get_live_price)
+        initial_proposed_trades_with_qty = []
+        total_initial_cost = 0
+        has_price_errors = False
+        for trade in st.session_state.proposed_trades:
+                ticker = trade["Ticker"]
+                target_amount = trade["Target Amount"]
+                # This part still needs a live price check
+                live_price_info = get_live_price(ticker) # Keep this call here for this specific calculation
+                current_price = live_price_info.get('ltp') if live_price_info else None
 
-        # Use st.data_editor for editing target amounts
-        edited_df = st.data_editor(
-            proposed_df,
-            column_config={
-                "Ticker": st.column_config.TextColumn("Ticker", disabled=True),
-                "Target Amount": st.column_config.NumberColumn("Target Amount ($)", min_value=0.0, step=10.0, format="$%.2f"),
-                "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
-            },
-            num_rows="dynamic", # Allow removing rows
-            key="proposed_trades_editor"
-        )
-
-        if st.button("🔍 Review & Calculate Trades"):
-            reviewed_trades_list = []
-            total_cost = 0.0
-            errors = []
-            current_cash = portfolio.get("cash", 0.0)
-
-            for index, row in edited_df.iterrows():
-                ticker = row["Ticker"]
-                target_amount = row["Target Amount"]
-                if not ticker or target_amount <= 0:
-                    continue # Skip removed or zero amount rows
-
-                current_price = get_simulated_price(ticker)
-                if current_price <= 0:
-                    errors.append(f"Could not get valid price for {ticker}.")
-                    continue
-
-                quantity = target_amount / current_price
-                cost = quantity * current_price # Should be very close to target_amount
-                total_cost += cost
-                reviewed_trades_list.append({
-                    "Ticker": ticker,
-                    "Quantity": round(quantity, 4),
-                    "Simulated Price ($)": current_price,
-                    "Estimated Cost ($)": round(cost, 2)
-                })
-
-            st.session_state.reviewed_trades = {
-                "trades": reviewed_trades_list,
-                "total_cost": round(total_cost, 2),
-                "errors": errors,
-                "sufficient_cash": current_cash >= total_cost
-            }
-            st.rerun() # Rerun to show the confirmation section
-
-        # --- Confirmation Section ---
-        if 'reviewed_trades' in st.session_state and st.session_state.reviewed_trades:
-            review_data = st.session_state.reviewed_trades
-            st.markdown("---")
-            st.subheader("Confirm Execution")
-
-            if review_data["errors"]:
-                for error in review_data["errors"]: st.error(error)
-
-            if review_data["trades"]:
-                st.dataframe(pd.DataFrame(review_data["trades"]), hide_index=True)
-                st.metric("Estimated Total Cost", f"${review_data['total_cost']:,.2f}")
-                st.metric("Available Cash", f"${portfolio.get('cash', 0.0):,.2f}")
-
-                if not review_data["sufficient_cash"]:
-                    st.error("Insufficient cash to execute all reviewed trades.")
+                if isinstance(current_price, (int, float)) and current_price > 0:
+                    quantity = target_amount / current_price
+                    cost = quantity * current_price
+                    total_initial_cost += cost
+                    initial_proposed_trades_with_qty.append({
+                        "Ticker": ticker,
+                        "Target Amount (₹)": target_amount, # Changed label ₹ -> ₹
+                        "Live Price (₹)": current_price,    # Changed label
+                        "Calculated Quantity": round(quantity, 4),
+                        "Estimated Cost (₹)": round(cost, 2), # Changed label
+                        "Strategy": trade.get("Strategy", "N/A")
+                    })
                 else:
-                    if st.button("✅ Execute Confirmed Trades", type="primary"):
-                        success_count = 0
-                        fail_count = 0
-                        # Get fresh portfolio data before executing multiple trades
-                        current_portfolio = get_paper_portfolio(username)
-                        for trade in review_data["trades"]:
-                            # Use the calculated quantity and amount (cost) for execution
-                            success, msg = execute_paper_trade(username, "Buy", trade["Ticker"], amount=trade["Estimated Cost ($)"])
-                            if success: success_count += 1
-                            else: fail_count += 1; st.warning(f"Failed to buy {trade['Ticker']}: {msg}")
+                    st.warning(f"Could not get live price for {ticker} to calculate initial quantity. It will be excluded.")
+                    has_price_errors = True
+                    # You might want to exclude these completely or display them differently
 
-                        st.success(f"Executed {success_count} trades successfully.")
-                        if fail_count > 0: st.error(f"{fail_count} trades failed.")
-                        # Clear proposed and reviewed trades from state after execution
-                        st.session_state.proposed_trades = None
-                        st.session_state.reviewed_trades = None
-                        st.rerun() # Rerun to show updated portfolio
+        # Display only valid trades for editing
+        valid_proposed_df = pd.DataFrame([t for t in initial_proposed_trades_with_qty if t["Calculated Quantity"] > 0])
+
+        if not valid_proposed_df.empty:
+            st.caption("Edit the 'Quantity to Buy' column below if needed.")
+            edited_df = st.data_editor(
+                valid_proposed_df,
+                column_config={
+                    "Ticker": st.column_config.TextColumn("Ticker", disabled=True),
+                    "Target Amount (₹)": st.column_config.NumberColumn("Target Amt (Ref)", format="₹%.2f", disabled=True),
+                    "Live Price (₹)": st.column_config.NumberColumn("Live Price", format="₹%.2f", disabled=True),
+                    "Calculated Quantity": st.column_config.NumberColumn("Quantity to Buy", min_value=0.0, step=0.0001, format="%.4f", required=True),
+                    "Estimated Cost (₹)": st.column_config.NumberColumn("Est. Cost", format="₹%.2f", disabled=True),
+                    "Strategy": st.column_config.TextColumn("Strategy", disabled=True),
+                },
+                key="proposed_trades_editor_qty"
+            )
+
+            if st.button("🔍 Review & Confirm Trades"):
+                # Review logic (calculating final cost based on potentially edited quantity)
+                reviewed_trades_list = []
+                total_final_cost = 0.0
+                errors = []
+                # Use the cash amount from the detailed portfolio fetched earlier
+                current_cash = portfolio_details.get("cash", 0.0)
+
+                for index, row in edited_df.iterrows():
+                    ticker = row["Ticker"]
+                    quantity_to_buy = row["Quantity to Buy"] # Use the edited quantity column name
+                    live_price = row["Live Price (₹)"] # Use the price from the initial calculation
+
+                    if not ticker or quantity_to_buy <= 0:
+                        continue
+
+                    if not isinstance(live_price, (int, float)) or live_price <= 0:
+                            errors.append(f"Invalid price stored for {ticker}.")
+                            continue
+
+                    cost = quantity_to_buy * live_price
+                    total_final_cost += cost
+                    reviewed_trades_list.append({
+                        "Ticker": ticker,
+                        "Quantity": round(quantity_to_buy, 4),
+                        "Live Price (₹)": live_price,
+                        "Estimated Cost (₹)": round(cost, 2)
+                    })
+
+                st.session_state.reviewed_trades = {
+                    "trades": reviewed_trades_list,
+                    "total_cost": round(total_final_cost, 2),
+                    "errors": errors,
+                    "sufficient_cash": current_cash >= total_final_cost
+                }
+                st.rerun()
+        else:
+                st.info("No valid trades to propose after fetching initial prices.")
+
+
+    # --- Confirmation Section (Calls execute_paper_trade from trading.py) ---
+    if 'reviewed_trades' in st.session_state and st.session_state.reviewed_trades:
+        review_data = st.session_state.reviewed_trades
+        st.markdown("---")
+        st.subheader("Confirm Execution")
+
+        if review_data["errors"]:
+            for error in review_data["errors"]: st.error(error)
+
+        if review_data["trades"]:
+            st.dataframe(pd.DataFrame(review_data["trades"]), hide_index=True,
+                            column_config={
+                                "Quantity": st.column_config.NumberColumn(format="%.4f"),
+                                "Live Price (₹)": st.column_config.NumberColumn(format="₹%.2f"),
+                                "Estimated Cost (₹)": st.column_config.NumberColumn(format="₹%.2f"),
+                            })
+            st.metric("Estimated Total Cost", f"₹{review_data['total_cost']:,.2f}")
+            # Use cash from detailed portfolio
+            st.metric("Available Cash", f"₹{portfolio_details.get('cash', 0.0):,.2f}")
+
+            if not review_data["sufficient_cash"]:
+                st.error("Insufficient cash to execute all reviewed trades.")
             else:
-                st.warning("No valid trades calculated for execution.")
+                if st.button("✅ Execute Confirmed Trades", type="primary"):
+                    success_count = 0
+                    fail_count = 0
+                    for trade in review_data["trades"]:
+                        # Call the CORRECT backend execute_paper_trade
+                        success, msg = execute_paper_trade(
+                            username, "Buy", trade["Ticker"], quantity=trade["Quantity"]
+                        )
+                        if success: success_count += 1
+                        else: fail_count += 1; st.warning(f"Failed to buy {trade['Ticker']}: {msg}")
+
+                    st.success(f"Attempted execution of {success_count} trades successfully.")
+                    if fail_count > 0: st.error(f"{fail_count} trades failed.")
+                    # Clear proposed and reviewed trades from state after execution attempt
+                    st.session_state.proposed_trades = None
+                    st.session_state.reviewed_trades = None
+                    st.rerun() # Rerun to show updated portfolio
+        else:
+                if not review_data["errors"]:
+                    st.warning("No valid trades reviewed for execution.")
 
 
     # --- Portfolio Summary ---
     st.divider()
     st.subheader("Portfolio Summary")
-    holdings = portfolio.get("holdings", [])
-    cash = portfolio.get("cash", 0.0)
-    holdings_value = 0.0
-    for holding in holdings:
-        current_price = get_simulated_price(holding['ticker']) # Use simulated price for current value
-        holdings_value += holding.get("quantity", 0) * current_price
-    total_value = cash + holdings_value
+    # (Keep the Portfolio Summary logic using portfolio_details as is)
+    calculated_totals = portfolio_details.get("calculated_totals", {})
+    cash = portfolio_details.get("cash", 0.0)
+    total_holdings_value = calculated_totals.get("total_holdings_value", 0.0)
+    total_portfolio_value = calculated_totals.get("total_portfolio_value", 0.0)
+    data_staleness = portfolio_details.get("data_staleness", {})
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Portfolio Value", f"${total_value:,.2f}")
-    col2.metric("Cash Balance", f"${cash:,.2f}")
-    col3.metric("Holdings Value", f"${holdings_value:,.2f}")
+    col1.metric("Total Portfolio Value", f"₹{total_portfolio_value:,.2f}")
+    if data_staleness.get("failed_prices", 0) > 0:
+        col1.caption(f"({data_staleness['failed_prices']} prices stale)")
+    col2.metric("Cash Balance", f"₹{cash:,.2f}")
+    col3.metric("Holdings Value", f"₹{total_holdings_value:,.2f}")
+
 
     # --- Current Holdings ---
     st.subheader("Current Holdings")
-    if not holdings: st.info("You currently have no holdings.")
+    holdings = portfolio_details.get("holdings", [])
+
+    if not holdings:
+        st.info("You currently have no holdings.")
     else:
-        holdings_df_data = []
-        for h in holdings:
-            current_price = get_simulated_price(h['ticker'])
-            current_holding_value = h.get("quantity", 0) * current_price
-            pnl = current_holding_value - (h.get("quantity", 0) * h.get("avg_cost", 0))
-            pnl_pct = (pnl / (h.get("quantity", 0) * h.get("avg_cost", 0)) * 100) if h.get("quantity", 0) * h.get("avg_cost", 0) != 0 else 0
-            holdings_df_data.append({
-                "Ticker": h["ticker"], "Quantity": h["quantity"], "Average Cost ($)": h["avg_cost"],
-                "Current Price ($)": current_price, "Current Value ($)": current_holding_value,
-                "P/L ($)": pnl, "P/L (%)": pnl_pct
-            })
-        holdings_df = pd.DataFrame(holdings_df_data)
-        st.dataframe(
-            holdings_df, hide_index=True, use_container_width=True,
-            column_config={
-                "Quantity": st.column_config.NumberColumn(format="%.4f"),
-                "Average Cost ($)": st.column_config.NumberColumn(format="$%.2f"),
-                "Current Price ($)": st.column_config.NumberColumn(format="$%.2f"),
-                "Current Value ($)": st.column_config.NumberColumn(format="$%.2f"),
-                "P/L ($)": st.column_config.NumberColumn(format="$%.2f"),
-                "P/L (%)": st.column_config.NumberColumn(format="%.2f%%"),
-            }
-        )
+        # Display header row using columns
+        header_cols = st.columns([2, 1, 2, 2, 2, 2]) # Adjust ratios as needed
+        header_cols[0].markdown("**Ticker**")
+        header_cols[1].markdown("**Quantity**")
+        header_cols[2].markdown("**Avg Cost (₹)**")
+        header_cols[3].markdown("**Mkt Price (₹)**")
+        header_cols[4].markdown("**Mkt Value (₹)**")
+        header_cols[5].markdown("**P/L (₹)** (%)")
+        st.divider()
+
+        # Iterate and display each holding with a trade form
+        for i, h in enumerate(holdings):
+            ticker = h["ticker"]
+            quantity = int(h["quantity"])
+            avg_cost = h["avg_cost"]
+            current_price = h.get("current_price")
+            current_value = h.get("current_value", 0.0)
+            pnl = h.get("pnl", 0.0)
+            pnl_pct = h.get("pnl_percentage", 0.0)
+            is_stale = h.get("is_price_stale", True)
+
+            data_cols = st.columns([2, 1, 2, 2, 2, 2])
+            data_cols[0].markdown(f"**{ticker}**")
+            data_cols[1].markdown(f"{quantity}")
+            data_cols[2].markdown(f"₹{avg_cost:,.2f}")
+            price_display = f"₹{current_price:,.2f}" if current_price is not None else "N/A"
+            data_cols[3].markdown(price_display)
+            data_cols[4].markdown(f"₹{current_value:,.2f}")
+            pnl_color = "grey"
+            if not is_stale:
+                 if pnl > 0: pnl_color = "green"
+                 elif pnl < 0: pnl_color = "red"
+            data_cols[5].markdown(f"<span style='color:{pnl_color};'>₹{pnl:,.2f} ({pnl_pct:+.2f}%)</span>", unsafe_allow_html=True)
+
+
+            # --- Trade Form Expander ---
+            with st.expander(f"Trade {ticker}"):
+                # --- Move Radio Button OUTSIDE the form ---
+                trade_action = st.radio(
+                    "Action",
+                    ["Buy", "Sell"],
+                    horizontal=True,
+                    key=f"action_holding_{ticker}_{i}" # Unique key
+                )
+
+                # --- Form contains only the input and button ---
+                with st.form(key=f"trade_holding_form_{ticker}_{i}"): # Unique form key
+                    if trade_action == "Buy":
+                        trade_qty = st.number_input(
+                            "Quantity to Buy", min_value=1, value=1, step=1,
+                            key=f"qty_buy_holding_{ticker}_{i}", # Unique input key
+                            format="%d"
+                        )
+                    else: # Sell action selected
+                        max_sell_qty = quantity # Use quantity from the loop
+                        trade_qty = st.number_input(
+                            f"Quantity to Sell (Max: {max_sell_qty})", min_value=0, max_value=max_sell_qty,
+                            value=0, step=1, key=f"qty_sell_holding_{ticker}_{i}", # Unique input key
+                            format="%d"
+                        )
+
+                    submitted = st.form_submit_button("Execute Trade")
+
+                    if submitted:
+                        try:
+                            final_trade_qty = int(trade_qty)
+                             # --- Validation ---
+                            if final_trade_qty <= 0 and trade_action == "Buy":
+                                st.warning("Buy quantity must be at least 1.")
+                            elif final_trade_qty < 0:
+                                st.warning("Quantity cannot be negative.")
+                            elif trade_action == "Sell" and final_trade_qty > quantity:
+                                # Re-check against current quantity in case it changed between render and submit
+                                # (Though less likely without page reload, good practice)
+                                current_portfolio_state = get_detailed_paper_portfolio(username)
+                                current_holding_state = next((ch for ch in current_portfolio_state.get("holdings", []) if ch["ticker"] == ticker), None)
+                                current_max_sell = int(current_holding_state['quantity']) if current_holding_state else 0
+                                if final_trade_qty > current_max_sell:
+                                     st.warning(f"Cannot sell {final_trade_qty} shares. You now hold {current_max_sell}.")
+                                else: # Quantity is valid
+                                     success, message = execute_paper_trade(username, trade_action, ticker, quantity=final_trade_qty)
+                                     if success:
+                                         st.success(message)
+                                         st.rerun()
+                                     else:
+                                         st.error(message)
+                            else: # Buy action or valid Sell action
+                                success, message = execute_paper_trade(username, trade_action, ticker, quantity=final_trade_qty)
+                                if success:
+                                    st.success(message)
+                                    st.rerun()
+                                else:
+                                    st.error(message)
+                        except (ValueError, TypeError):
+                            st.error("Invalid quantity entered. Please enter a whole number.")
+
+
+            st.divider() # Separator between holdings
 
     # --- Trade History ---
     st.subheader("Trade History")
-    history = portfolio.get("history", [])
-    if not history: st.caption("No trading history yet.")
+    # (Keep the Trade History display logic as is)
+    transactions = get_paper_transactions(username, limit=25)
+    if not transactions: st.caption("No trading history yet.")
     else:
+        # ... (Existing history display logic using DataFrame) ...
         history_df_data = []
-        for entry in sorted(history, key=lambda x: x.get("timestamp", ""), reverse=True)[:20]:
-             ts_str = entry.get("timestamp", "")
-             ts = datetime.fromisoformat(ts_str) if ts_str else datetime.min
-             details_str = json.dumps(entry.get("details", {}))
-             history_df_data.append({
-                 "Timestamp": ts.strftime("%Y-%m-%d %H:%M:%S") if ts != datetime.min else "N/A",
-                 "Action": entry.get("action", "N/A"),
-                 "Details": details_str
-             })
+        for entry in transactions: # Already sorted
+                ts = entry.get("timestamp")
+                details = {
+                    "price": entry.get("price"), "value": entry.get("cost_or_proceeds"),
+                    "status": entry.get("status"), "msg": entry.get("message")
+                }
+                details_str = json.dumps({k: v for k, v in details.items() if v is not None})
+
+                history_df_data.append({
+                    "Timestamp": ts.strftime("%Y-%m-%d %H:%M:%S") if isinstance(ts, datetime) else "N/A",
+                    "Action": entry.get("action", "N/A"),
+                    "Ticker": entry.get("ticker", "--"),
+                    "Quantity": int(entry["quantity"]) if entry.get("quantity") is not None else None,
+                    "Details": details_str
+                })
         history_df = pd.DataFrame(history_df_data)
-        st.dataframe(history_df, hide_index=True, use_container_width=True)
+        st.dataframe(history_df, hide_index=True, use_container_width=True,
+                        column_config={
+                        "Quantity": st.column_config.NumberColumn(format="%d"),
+                        "Details": st.column_config.TextColumn(width="medium")
+                        })
 
 
 # --- Main App Router ---
