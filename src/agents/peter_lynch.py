@@ -178,9 +178,9 @@ def lynch_fundamentals(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
           else None)
 
         values = {
-            "Debt-to-Equity": round(de_ratio, 2),
-            "Operating Margin (%)": round(operating_margin, 2) if operating_margin is not None else None,
-            "FCF Margin (%)": round(fcf_margin, 2) if fcf_margin is not None else None
+            "Debt-to-Equity": de_ratio,
+            "Operating Margin (%)": operating_margin if operating_margin is not None else None,
+            "FCF Margin (%)": fcf_margin if fcf_margin is not None else None
         }
         results["Parameters"] = {k: v if v is not None else "N/A" for k, v in values.items()}
 
@@ -399,7 +399,6 @@ def run_financial_analysis(symbol: str, fundamental_data: Dict[str, Any]) -> Dic
     }
 
     try:
-
         # Or just invoke to get the final state
         final_state = financial_analysis_graph.invoke(initial_state, config=config)
         logger.info(f"Financial analysis run completed for {symbol}.")
@@ -433,33 +432,39 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
     Returns:
         JSON string containing the analysis report from the LLM or an error message.
     """
-    logger.info(f"Starting fundamental agent for {symbol} on {exchange}...")
+    logger.info(f"Starting peter lynch agent for {symbol} on {exchange}...")
     # Get fundamental data from database
     fundamental_data = get_overall_fundamental_data(symbol=symbol, exchange=exchange, force=force, refresh_days=refresh_days)
 
     if not fundamental_data:
         logger.error(f"No fundamental data found for symbol: {symbol}")
-        return json.dumps({"error": f"No fundamental data found for symbol: {symbol}"})
+        return {"error": f"No fundamental data found for symbol: {symbol}"}
 
     # Run the financial analysis subgraph
     analysis_results = run_financial_analysis(symbol, fundamental_data)
 
     if "error" in analysis_results:
          # Error already logged in run_financial_analysis
-         return json.dumps(analysis_results) # Return the error dict as JSON
+         return analysis_results # Return the error dict as JSON
 
     # Filter out None values before sending to LLM for cleaner prompt
     filtered_results = {k: v for k, v in analysis_results.items() if v is not None}
 
     if not filtered_results:
         logger.error(f"Analysis yielded no results for {symbol}")
-        return json.dumps({"error": f"Analysis yielded no results for {symbol}"})
+        return {"error": f"Analysis yielded no results for {symbol}"}
 
 
     # Prepare messages for LLM
     messages = [
-        {"role": "system", "content": peter_lynch_system_prompt},
-        {"role": "user", "content": f"Analyze these Lynch metrics for {symbol}:\n{json.dumps(analysis_results, indent=2)}"}
+        {
+            "role": "system",
+            "content": peter_lynch_system_prompt # Ensure this prompt asks for JSON output
+        },
+        {
+            "role": "user",
+            "content": f"Please perform a comprehensive fundamental analysis for {symbol} based on the following calculated metrics (including parameters, Z-scores relative to typical ranges, points awarded [0-2], confidence levels, and signals). Provide a summary of the company's financial health across all component of peter lynch's evaluation (growth, fundamental, valuation). Conclude with an overall investment recommendation (e.g., BULLISH, BEARISH, NEUTRAL) and rationale. Ensure the final output is a single JSON object.\n\nAnalysis Metrics:\n{json.dumps(filtered_results, indent=2)}"
+        }
     ]
 
     try:
@@ -474,7 +479,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         logger.info(f"Received LLM response for {symbol}.")
 
         # Attempt to parse the LLM output to ensure it's valid JSON
-        analyse = parse_fundamental_response(response.choices[0].message.content)
+        analyse = response.choices[0].message.content
         return analyse
 
     except Exception as e:
@@ -484,7 +489,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 if __name__ == "__main__":
     # Use a common symbol for testing, ensure you have data for it
     # or that get_overall_fundamental_data can fetch it.
-    symbol_to_test = "RELIANCE"
-    print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
-    analysis_report_json = peter_lynch_agent(symbol_to_test, exchange="nse", force=False, refresh_days=30) # Increase refresh days for testing
+    symbol_to_test = "REDINGTON"
+    print(f"--- Running Peter Lynch Agent for {symbol_to_test} ---")
+    analysis_report_json = peter_lynch_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
     print(analysis_report_json)

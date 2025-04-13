@@ -419,17 +419,17 @@ You will receive a JSON object from the user containing analysis results for a s
   },
   "detailed_lynch_analysis": {
     "growth_assessment": {
-      "signal": "<The 'Signal' provided in the input lynch_growth (e.g., 'STRONG_GROWTH', 'MODERATE_GROWTH', 'WEAK_GROWTH')>",
+      "signal": "<The 'Signal' provided in the input lynch_growth (e.g., 'BULLISH', 'BEARISH', 'NEUTRAL')>",
       "confidence_pct": "<The 'Confidence Level (%)' provided in the input lynch_growth>",
       "summary": "<Brief interpretation (1-2 sentences) of the growth profile from a Lynch perspective, commenting on consistency and rate based on the input signal/metrics. Example: 'Growth looks solid and steady, the kind Lynch liked.' or 'Growth is a bit jumpy, makes it harder to predict.'>"
     },
     "fundamental_strength": {
-      "signal": "<The 'Signal' provided in the input lynch_fundamentals (e.g., 'STRONG_FINANCIALS', 'AVERAGE_FINANCIALS', 'WEAK_FINANCIALS')>",
+      "signal": "<The 'Signal' provided in the input lynch_fundamentals (e.g., 'BULLISH', 'BEARISH', 'NEUTRAL')>",
       "confidence_pct": "<The 'Confidence Level (%)' provided in the input lynch_fundamentals>",
       "summary": "<Brief interpretation (1-2 sentences) of the company's financial health from a Lynch perspective, focusing on debt levels and stability based on the input signal/metrics. Example: 'Balance sheet looks sturdy, not much debt to worry about.' or 'A bit too much debt here for my liking.'>"
     },
     "valuation_attractiveness": {
-      "signal": "<The 'Signal' provided in the input lynch_valuation (e.g., 'UNDERVALUED', 'FAIRLY_VALUED', 'OVERVALUED')>",
+      "signal": "<The 'Signal' provided in the input lynch_valuation (e.g., 'BULLISH', 'BEARISH', 'NEUTRAL')>",
       "confidence_pct": "<The 'Confidence Level (%)' provided in the input lynch_valuation>",
       "summary": "<Brief interpretation (1-2 sentences) of the valuation using the GARP lens, heavily emphasizing the PEG ratio based on the input signal/metrics. Example: 'The PEG ratio screams cheap! Looks like the market hasn't caught on yet.' or 'Valuation seems stretched, the PEG is too high right now.'>"
     }
