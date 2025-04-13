@@ -250,7 +250,7 @@ def calculate_profitability_ratios(fundamental_data: Dict[str, Any]) -> Dict[str
         if confidence_level >= 75:
             signal = "BULLISH"
         elif confidence_level >= 45:
-            signal = "HEALTHY"
+            signal = "NEUTRAL"
         else:
             signal = "BEARISH"
         results["Signal"] = signal
@@ -369,7 +369,7 @@ def compute_leverage_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
         if confidence_level >= 75:
             signal = "BULLISH"
         elif confidence_level >= 45:
-            signal = "HEALTHY"
+            signal = "NEUTRAL"
         else:
             signal = "BEARISH"
         results["Signal"] = signal
@@ -680,7 +680,7 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 if __name__ == "__main__":
     # Use a common symbol for testing, ensure you have data for it
     # or that get_overall_fundamental_data can fetch it.
-    symbol_to_test = "SBIN"
+    symbol_to_test = "RELIANCE"
     print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
-    analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=False, refresh_days=30) # Increase refresh days for testing
+    analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
     print(analysis_report_json)
