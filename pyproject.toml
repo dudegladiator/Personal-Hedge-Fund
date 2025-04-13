@@ -34,4 +34,4 @@ dependencies = [
 # This section tells setuptools how to find your code
 [tool.setuptools.packages.find]
 where = ["."] # Search for packages in the root directory
-include = ["src*"]  # Find the 'src' package and any subpackages
+include = ["src*", "utils*"]  # Find the 'src' package and any subpackages
