@@ -1,0 +1,39 @@
+[theme]
+base = "light"
+
+primaryColor="#f84f08"
+backgroundColor="#fff7f4"
+secondaryBackgroundColor="#b4e2ff"
+textColor="#000000"
+
+# Color used for all links. Using primaryColor is a common choice.
+linkColor = "#f84f08" # You might want to adjust this if it doesn't contrast well
+
+# Background color used for code blocks. A light grey usually works well for light themes.
+codeBackgroundColor = "#f0f2f6" # Example: light grey
+
+# Font family for all text, except code blocks.
+# Options: "sans serif", "serif", "monospace"
+font = "sans-serif"
+
+# Font family to use for code blocks.
+# Options: "sans serif", "serif", "monospace"
+codeFont = "monospace"
+
+# Font family to use for headings. If undefined, uses font.
+# headingFont = "sans-serif" # Uncomment and set if you want a different heading font
+
+# Radius for UI elements corners. Options: "none", "small", "medium", "large", "full", or numeric (e.g., "0.5rem").
+baseRadius = "medium"
+
+# Color of the border around elements. A light grey usually works.
+borderColor = "#cccccc" # Example: light grey
+
+# Whether to show a border around input widgets.
+showWidgetBorder = true
+
+# Base font size for the app (in pixels). Default is 16.
+# baseFontSize = 18 # Uncomment to override default
+
+# Whether to show a vertical separator between the sidebar and the main content area.
+showSidebarBorder = true

@@ -3,12 +3,9 @@ from typing import Dict, Optional
 import pytz
 import requests
 from utils.app_logger import setup_logger
-from utils.config import settings, get_sync_database, get_async_database
-from models import GrowwStockDetails, LivePrice
-from utils.util import indian_stock_market_open
+from utils.config import get_sync_database
 
 logger = setup_logger("src/data_source/groww_apis.py")
-
 db = get_sync_database()
 
 def get_live_price(symbol: str, exchange: str = "NSE") -> Optional[Dict]:
@@ -17,15 +14,7 @@ def get_live_price(symbol: str, exchange: str = "NSE") -> Optional[Dict]:
     If market is open: Fetch from API
     If market is closed: Fetch from DB
     """
-    try:
-        # Check if market is open
-        is_market_open = indian_stock_market_open()
-        
-        if not is_market_open:
-            latest_price = db.live_price.find_one({"symbol": symbol, "exchange": exchange})
-            if latest_price:
-                return latest_price
-        
+    try: 
         # If market is open, fetch from API
         url = f"https://groww.in/v1/api/stocks_data/v1/accord_points/exchange/{exchange}/segment/CASH/latest_prices_ohlc/{symbol}"
         response = requests.get(url, timeout=10)
@@ -35,34 +24,24 @@ def get_live_price(symbol: str, exchange: str = "NSE") -> Optional[Dict]:
             return None
             
         data = response.json()
+        live_price = {
+            "symbol": symbol,
+            "exchange": exchange,
+            "open": data['open'],
+            "high": data['high'],
+            "low": data['low'],
+            "close": data['close'],
+            "ltp": data['ltp'],   # last traded price
+            "volume": data['volume'],
+            "timestamp": data['tsInMillis'],
+            "day_change": data['dayChange'],
+            "day_change_percentage": data['dayChangePerc'],
+            "updated_at": datetime.now(pytz.UTC)
+        }
         
-        # Create LivePrice model instance
-        live_price = LivePrice(
-            symbol=symbol,
-            exchange=exchange,
-            open=data['open'],
-            high=data['high'],
-            low=data['low'],
-            close=data['close'],
-            ltp=data['ltp'],   # last traded price
-            volume=data['volume'],
-            timestamp=data['tsInMillis'],
-            day_change=data['dayChange'],
-            day_change_percentage=data['dayChangePerc']
-        )
-        
-        # Update or insert into database (upsert)
-        # Use symbol and exchange as the unique key to identify the record
-        db.live_price.update_one(
-            {"symbol": symbol, "exchange": exchange},  # Query to match the document
-            {
-                "$set": live_price.model_dump()  # Update all fields with the new data
-            },
-            upsert=True  # If no matching document exists, insert a new one
-        )
         
         logger.info(f"Successfully fetched and stored live price for {symbol}")
-        return live_price.model_dump()
+        return live_price
         
     except requests.RequestException as e:
         logger.error(f"Network error while fetching price for {symbol}: {str(e)}")
@@ -86,7 +65,7 @@ def groww_stock_details(query: str) -> Optional[Dict]:
         query_lower = query.lower()
         db_result = db.groww_stock_details.find_one({
             "$or": [
-                {"symbol": {"$regex": query, "$options": "i"}}
+                {"symbol": {"$regex": query_lower, "$options": "i"}}
             ],
         })
 
@@ -112,30 +91,29 @@ def groww_stock_details(query: str) -> Optional[Dict]:
         # Get the first result
         first_result = search_data['data']['content'][0]
         search_id = first_result.get('search_id', '')
-
-        # Create comprehensive model instance
-        stock_details = GrowwStockDetails(
-            # Basic information from first API
-            symbol=query,
-            search_id=search_id,
-            title=first_result.get('title', ''),
-            bse_scrip_code=first_result.get('bse_scrip_code'),
-            nse_scrip_code=first_result.get('nse_scrip_code'),
-            isin=first_result.get('isin'),
-            entity_type=first_result.get('entity_type', '')
-        )
+        
+        stock_details = {
+            "symbol": query,
+            "search_id": search_id,
+            "title": first_result.get('title', ''),
+            "bse_scrip_code": first_result.get('bse_scrip_code'),
+            "nse_scrip_code": first_result.get('nse_scrip_code'),
+            "isin": first_result.get('isin'),
+            "entity_type": first_result.get('entity_type', ''),
+            "updated_at": datetime.now(pytz.UTC)
+        }
 
         # Update database
         db.groww_stock_details.update_one(
             {"search_id": stock_details.search_id},
             {
-                "$set": stock_details.model_dump()
+                "$set": stock_details
             },
             upsert=True
         )
 
         logger.info(f"Successfully fetched and stored comprehensive details for: {query}")
-        return stock_details.model_dump()
+        return stock_details
 
     except requests.RequestException as e:
         logger.error(f"Network error while fetching details for {query}: {str(e)}")
@@ -215,6 +193,8 @@ def stock_full_info(search_id: str) -> Optional[Dict]:
         return None
 
 if __name__ == "__main__":
-    print(groww_stock_details("reliance"))
+    # print(groww_stock_details("reliance"))
     # print(stock_full_info("reliance-industries-ltd"))
     pass
+
+    print(get_live_price("RELIANCE", "NSE"))
