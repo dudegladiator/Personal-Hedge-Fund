@@ -1,3 +1,0 @@
-build-essential
-wget
-python3-ta-lib
