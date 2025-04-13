@@ -30,3 +30,8 @@ dependencies = [
     "ta-lib-bin==0.4.26",
     "yfinance==0.2.54",
 ]
+
+# This section tells setuptools how to find your code
+[tool.setuptools.packages.find]
+where = ["."] # Search for packages in the root directory
+include = ["src*"]  # Find the 'src' package and any subpackages
