@@ -15,14 +15,6 @@ from src.data_source.apis_3 import get_tickertape_movers, search_tickertape_stoc
 from src.routers.auth import authenticate_user
 from src.routers.trading import add_funds_to_portfolio, execute_paper_trade, get_detailed_paper_portfolio, get_paper_portfolio, get_paper_transactions
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="AI Portfolio Manager", # Page title in the browser tab
-    layout="wide", # "wide" or "centered" or "full"
-    initial_sidebar_state="expanded", # "expanded" or "collapsed" or "auto"
-    page_icon="💰", # Icon in the browser tab
-)
-
 # --- Constants ---
 PAGE_LOGIN = "login"
 PAGE_HOME = "home" # New Home Page
