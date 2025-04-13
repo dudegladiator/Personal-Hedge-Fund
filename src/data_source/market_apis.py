@@ -10,6 +10,77 @@ db = get_sync_database()
 
 baseURL = "https://frapi.marketsmojo.com"
 
+def get_live_indices_pricing() -> Optional[List[Dict]]:
+    try:
+        # Fetch from API
+        url = f"{baseURL}/market_marketoverview/getAllIndices"
+        params = {
+            "period": "1d", # Standard for current overview
+            "page": "stock"  # As seen in the curl command
+        }
+
+        headers = {
+             'Accept': 'application/json, text/plain, */*'
+        }
+
+        logger.info(f"Fetching live indices data from API: {url}")
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        response.raise_for_status() # Raise HTTPError for bad status codes (4xx or 5xx)
+
+        raw_data = response.json()
+
+        # --- Data Extraction and Structuring ---
+        indices_list_raw = raw_data.get('data', {}).get('all_indices', [])
+
+        if not indices_list_raw:
+            logger.warning("No indices found in the API response data.")
+            return [] # Return empty list if no indices data
+
+        structured_data = []
+        for item in indices_list_raw:
+            # Extract values using .get() for safety
+            index_name = item.get('sensex')
+            if index_name not in ["NIFTY", "SENSEX"]:
+                continue
+            last_price_str = item.get('cmp')
+            change_str = item.get('chg')
+            # Use 'chgp_val' as it's already a numerical string representation
+            percent_change_str = item.get('chgp_val')
+
+            # Basic validation
+            if not index_name or last_price_str is None:
+                logger.warning(f"Skipping index item due to missing name or price: {item}")
+                continue
+            try:
+                # Clean and convert to float
+                value = float(str(last_price_str).replace(',', ''))
+                change = float(str(change_str).replace(',', '')) if change_str is not None else 0.0
+                percent_change = float(str(percent_change_str)) if percent_change_str is not None else 0.0
+
+                # Append to the list in the desired format
+                structured_data.append({
+                    "Name": index_name,
+                    "Value": value,
+                    "Change": change,
+                    "Change %": percent_change
+                })
+            except (ValueError, TypeError) as e:
+                 logger.warning(f"Could not parse index data for {index_name}: {e}. Raw item: {item}")
+                 # Skip items that cannot be parsed correctly
+
+        logger.info(f"Successfully fetched and processed {len(structured_data)} indices.")
+        return structured_data
+
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error fetching live indices data.")
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Network error fetching live indices data: {str(e)}")
+        return []
+    except Exception as e:
+        logger.error(f"Error processing live indices data: {str(e)}", exc_info=True)
+        return []
+
 def get_stock_sid(symbol: str, exchange: str = "nse", force: bool = False) -> Optional[str]:
     """
     Get stock SID from MarketsMojo
@@ -1626,6 +1697,8 @@ if __name__ == "__main__":
     
     # get_overall_fundamental_data("RELIANCE", "nse")
     
-    print(get_balance_sheet_data("IRCTC", "nse"))
+    # print(get_balance_sheet_data("IRCTC", "nse"))
+    
+    print(get_live_indices_pricing())
  
     pass

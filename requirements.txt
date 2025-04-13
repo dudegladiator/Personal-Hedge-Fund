@@ -21,3 +21,4 @@ numpy==2.2.4
 ta-lib==0.6.3
 
 streamlit==1.44.0
+bcrypt==4.3.0

@@ -3,11 +3,15 @@ import pandas as pd
 import numpy as np
 import time
 import random
-import uuid # For generating unique job IDs
+import uuid
 from datetime import datetime
-import hashlib # For password hashing
-import os # For salt generation
-import json # For file I/O
+import hashlib 
+import os
+import json
+
+from src.data_source.market_apis import get_live_indices_pricing
+from src.data_source.ticker_tape_apis import get_tickertape_movers, search_tickertape_stocks
+from src.routers.auth import authenticate_user
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -59,39 +63,6 @@ PAPER_PORTFOLIOS_FILE = os.path.join(DATA_DIR, "paper_portfolios.json") # New fi
 # --- Ensure Data Directory Exists ---
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# --- Password Hashing Utilities ---
-def hash_password(password, salt=None):
-    """Hashes the password using SHA-256 with a salt."""
-    if salt is None:
-        salt = os.urandom(16) # Generate a new random salt
-    hashed_password = hashlib.pbkdf2_hmac(
-        'sha256', password.encode('utf-8'), salt, 100000 # 100k iterations
-    )
-    return salt, hashed_password
-
-def verify_password(stored_salt, stored_hash, provided_password):
-    """Verifies a provided password against the stored salt and hash."""
-    try:
-        salt = bytes.fromhex(stored_salt) # Convert hex string back to bytes
-        stored_hash_bytes = bytes.fromhex(stored_hash) # Convert hex string back to bytes
-    except (ValueError, TypeError):
-        # Handle cases where salt/hash might not be valid hex (e.g., old data)
-        return False
-    _, hashed_provided_password = hash_password(provided_password, salt)
-    return hashed_provided_password == stored_hash_bytes
-
-# --- Persistent Data Loading/Saving ---
-
-# Use st.cache_data for loading to avoid reloading files on every script run within a session
-@st.cache_data(ttl=60) # Cache for 60 seconds
-def load_users():
-    """Loads user data from the JSON file."""
-    try:
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
 # Manage jobs and portfolios manually for modification
 _persistent_jobs_data = None
 _persistent_paper_portfolios = None
@@ -107,14 +78,6 @@ def load_jobs_data():
         except (FileNotFoundError, json.JSONDecodeError):
             _persistent_jobs_data = {}
     return _persistent_jobs_data
-
-def save_users(users_data):
-    """Saves user data to the JSON file."""
-    try:
-        with open(USERS_FILE, 'w') as f:
-            json.dump(users_data, f, indent=4)
-    except IOError as e:
-        st.error(f"Error saving user data: {e}")
 
 def save_jobs_data():
     """Saves the current state of jobs data to the JSON file."""
@@ -168,7 +131,7 @@ def initialize_session():
     if 'selected_job_id' not in st.session_state:
         st.session_state.selected_job_id = None
     if 'home_market_cap_filter' not in st.session_state:
-        st.session_state.home_market_cap_filter = "All"
+        st.session_state.home_market_cap_filter = "LargeCap"
     # State for proposed trades on paper trading page
     if 'proposed_trades' not in st.session_state:
         st.session_state.proposed_trades = None # Stores list of dicts like {"Ticker": "AAPL", "Target Amount": 10000}
@@ -296,37 +259,14 @@ def check_login():
         return True
 
     st.title("🔒 AI Portfolio Manager Login")
-    users_db = load_users()
-
-    if not users_db:
-        st.info("No users found. Please register the first admin user.")
-        with st.form("register_form"):
-            reg_username = st.text_input("Choose Admin Username").lower()
-            reg_password = st.text_input("Choose Admin Password", type="password")
-            reg_submitted = st.form_submit_button("Register Admin")
-            if reg_submitted:
-                if reg_username and reg_password:
-                    if reg_username in users_db:
-                         st.error("Username already exists.")
-                    else:
-                        salt, hashed_pw = hash_password(reg_password)
-                        users_db[reg_username] = {"salt": salt.hex(), "hashed_password": hashed_pw.hex()}
-                        save_users(users_db)
-                        st.success(f"Admin user '{reg_username}' registered successfully! Please login.")
-                        time.sleep(1)
-                        st.rerun()
-                else:
-                    st.error("Username and password cannot be empty.")
-        return False
-
     with st.form("login_form"):
         username = st.text_input("Username").lower()
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
 
         if submitted:
-            user_data = users_db.get(username)
-            if user_data and verify_password(user_data.get("salt",""), user_data.get("hashed_password",""), password):
+            authenticated_user_info = authenticate_user(username, password)
+            if authenticated_user_info:
                 st.session_state.logged_in_user = username
                 st.session_state.current_page = PAGE_HOME # Default to home after login
                 # Clear any leftover proposed trades from previous sessions/users
@@ -335,9 +275,8 @@ def check_login():
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
-    return False
 
-# --- Navigation ---
+    return False
 
 def navigate_to(page_name, job_id=None, clear_proposed=False):
     st.session_state.current_page = page_name
@@ -356,6 +295,13 @@ def display_sidebar():
     st.sidebar.button("➕ Start New Analysis", on_click=navigate_to, args=(PAGE_NEW_ANALYSIS, None, True), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_NEW_ANALYSIS else "secondary")
     st.sidebar.button("📊 View Analysis Jobs", on_click=navigate_to, args=(PAGE_JOB_STATUS, None, True), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_JOB_STATUS else "secondary")
     st.sidebar.button("📄 Paper Trading", on_click=navigate_to, args=(PAGE_PAPER_TRADE, None, False), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_PAPER_TRADE else "secondary") # Don't clear proposed trades when going here
+    
+    st.sidebar.markdown("---") # Separator
+
+    # --- Refresh Button ---
+    if st.sidebar.button("🔄 Refresh Data", use_container_width=True, key="manual_refresh"):
+        st.rerun() # Trigger a full rerun to refresh data
+        
     st.sidebar.markdown("---")
     st.sidebar.button("🚪 Logout", on_click=logout, use_container_width=True)
 
@@ -985,46 +931,6 @@ def render_job_status():
 
     if rerun_needed: st.rerun()
 
-# --- Home Page Rendering ---
-def generate_dummy_market_data(cap_filter="All"):
-    # Define the base data within the function or load from a source
-    all_stocks = {
-        "AAPL": {"Cap": "Large-Cap", "Price": 175.20, "Change": 1.5}, "MSFT": {"Cap": "Large-Cap", "Price": 305.50, "Change": -0.8},
-        "GOOGL": {"Cap": "Large-Cap", "Price": 105.10, "Change": 2.1}, "AMZN": {"Cap": "Large-Cap", "Price": 102.80, "Change": -1.2},
-        "TSLA": {"Cap": "Large-Cap", "Price": 190.60, "Change": 3.5}, "NVDA": {"Cap": "Large-Cap", "Price": 450.00, "Change": 4.1},
-        "ETSY": {"Cap": "Mid-Cap", "Price": 115.30, "Change": 2.8}, "DOCN": {"Cap": "Mid-Cap", "Price": 35.70, "Change": -2.5},
-        "PLTR": {"Cap": "Mid-Cap", "Price": 15.10, "Change": 5.5}, "RBLX": {"Cap": "Mid-Cap", "Price": 38.90, "Change": -1.9},
-        "SAVA": {"Cap": "Small-Cap", "Price": 25.40, "Change": 10.2}, "GME": {"Cap": "Small-Cap", "Price": 18.60, "Change": -5.1},
-        "AMC": {"Cap": "Small-Cap", "Price": 4.50, "Change": 7.3}, "BBBY": {"Cap": "Small-Cap", "Price": 0.20, "Change": -15.0}, # Note: BBBY is delisted, just for demo
-    }
-
-    # Simulate missing change data if needed (can be removed if data is complete)
-    for ticker in all_stocks:
-        if "Change" not in all_stocks[ticker]:
-             all_stocks[ticker]["Change"] = round(random.uniform(-8.0, 8.0), 1)
-
-    # Filter tickers based on market cap
-    filtered_tickers = [t for t, info in all_stocks.items() if cap_filter == "All" or info["Cap"] == cap_filter]
-
-    if not filtered_tickers:
-        return [], [], all_stocks # Return empty lists and the full stock dict
-
-    # Sort filtered tickers by change
-    sorted_tickers = sorted(filtered_tickers, key=lambda t: all_stocks[t]["Change"], reverse=True)
-
-    # Select top 5 gainers and losers from the *filtered* list
-    gainers = [{"Ticker": t, **all_stocks[t]} for t in sorted_tickers if all_stocks[t]["Change"] > 0][:5]
-    losers = [{"Ticker": t, **all_stocks[t]} for t in sorted_tickers if all_stocks[t]["Change"] < 0][::-1][:5] # Reverse losers list to show worst first
-
-    return gainers, losers, all_stocks # <-- RETURN all_stocks
-
-def generate_dummy_indices():
-    return [
-        {"Name": "S&P 500", "Value": 4350.25, "Change": 15.75, "Change %": 0.36},
-        {"Name": "NASDAQ", "Value": 13580.10, "Change": 85.30, "Change %": 0.63},
-        {"Name": "Dow Jones", "Value": 34050.60, "Change": -50.10, "Change %": -0.15},
-    ]
-
 def execute_paper_trade(username, action, ticker, quantity=None, amount=None):
     """Executes a buy or sell paper trade."""
     portfolio = get_paper_portfolio(username)
@@ -1063,21 +969,28 @@ def execute_paper_trade(username, action, ticker, quantity=None, amount=None):
     else:
         return False, "Invalid action."
 
+def render_stock_details_popup(stock_data: dict):
+    ticker = stock_data.get('Ticker', 'N/A')
+    current_price = stock_data.get('Price', 0.0)
+    # Use the 'Change' percentage directly from the API data
+    day_change_pct = stock_data.get('Change', 0.0)
 
-def render_stock_details_popup(ticker):
-    """Renders dummy stock details and Buy/Sell options."""
-    st.markdown(f"#### {ticker} Overview (Simulated)")
+    st.markdown(f"#### {ticker} Overview")
     col1, col2 = st.columns(2)
-    current_price = get_simulated_price(ticker)
-    col1.metric("Current Price", f"${current_price:.2f}")
-    # Simulate a day change based on current vs slightly older price
-    day_change_pct = (current_price / (current_price / random.uniform(0.97, 1.03)) - 1) * 100
-    col2.metric("Day's Change", f"{day_change_pct:.2f}%", delta_color=("inverse" if day_change_pct < 0 else "normal"))
-    # Simple random walk for chart
-    # price_history = (np.random.randn(20) * (current_price * 0.01)).cumsum() + current_price
-    # st.line_chart(pd.DataFrame(price_history, columns=['Price']))
-    # st.caption("Recent simulated performance.")
-    # st.markdown("---")
+
+    # Display Price from API data
+    col1.metric("Current Price", f"₹{current_price:,.2f}") # Format as currency
+
+    # Display Change % from API data
+    # Determine color based on the sign of the change percentage
+    delta_color = "off" # Default grey for 0% change
+    if day_change_pct > 0:
+        delta_color = "normal" # Streamlit's default green
+    elif day_change_pct < 0:
+        delta_color = "inverse" # Streamlit's default red
+
+    col2.metric("Day's Change", f"{day_change_pct:+.2f}%", delta_color=delta_color)
+    
     st.subheader("Paper Trade Actions")
     action = st.radio("Action", ["Buy", "Sell"], horizontal=True, key=f"action_{ticker}")
 
@@ -1109,10 +1022,10 @@ def render_stock_details_popup(ticker):
 
 def render_home():
     st.title("📈 Market Overview")
-
+ 
     # --- Indices ---
-    st.subheader("Major Indices (Simulated)")
-    indices = generate_dummy_indices()
+    st.subheader("Indices")
+    indices = get_live_indices_pricing()
     idx_cols = st.columns(len(indices))
     for i, idx in enumerate(indices):
         delta = f"{idx['Change']:+.2f} ({idx['Change %']:+.2f}%)"
@@ -1152,41 +1065,58 @@ def render_home():
             st.session_state.home_search_query = search_term.strip().upper()
             # Rerun happens implicitly
 
-    # --- Get Market Data (Gainers/Losers/All Stocks) ---
-    # (Rest of the function remains the same as the previous corrected version)
-    gainers, losers, all_stocks_data = generate_dummy_market_data(st.session_state.home_market_cap_filter)
-
     # --- Display Search Result ---
-    if st.session_state.home_search_query:
-        search_ticker = st.session_state.home_search_query
-        stock_info = all_stocks_data.get(search_ticker)
-        st.markdown("---") # Separator for search result
-        if stock_info:
-            st.markdown(f"#### Search Result: {search_ticker}")
-            with st.container(border=True):
-                s_col1, s_col2 = st.columns([3, 1])
-                change_pct = stock_info.get('Change', 0.0)
-                price = stock_info.get('Price', 0.0)
-                cap = stock_info.get('Cap', 'N/A')
+    if st.session_state.home_search_query: # Check if a search query exists
+        query = st.session_state.home_search_query
+        st.markdown("---") # Separator before search results
+        st.markdown(f"#### Search Results for: \"{query}\"")
+
+        # Call the search API
+        search_results = search_tickertape_stocks(query, limit=5)
+
+        if search_results is None:
+            st.error("An error occurred while searching. Please try again.")
+        elif not search_results: # Empty list means no results found
+            st.info(f"No NSE stock results found matching \"{query}\".")
+        else:
+            # Display results in a list format
+            for stock in search_results:
+                # Determine color based on change percentage
+                change_pct = stock.get('Change %', 0.0)
                 color = "green" if change_pct > 0 else ("red" if change_pct < 0 else "grey")
 
-                s_col1.markdown(f"**{search_ticker}** ({cap})")
-                s_col1.caption(f"Price: ${price:.2f}")
-                s_col2.markdown(f"<span style='color:{color}; font-weight:bold;'>{change_pct:+.1f}%</span>", unsafe_allow_html=True)
-                with st.expander("Details / Trade"):
-                    render_stock_details_popup(search_ticker)
-        else:
-            st.warning(f"Ticker '{search_ticker}' not found in simulated data.")
-        st.markdown("---") # Separator after search result
+                with st.container(border=True):
+                    s_col1, s_col2 = st.columns([3, 1])
+                    # Display Ticker and Name
+                    s_col1.markdown(f"**{stock.get('Ticker', 'N/A')}**")
+                    s_col1.caption(f"{stock.get('Name', 'Unknown Name')}")
+                    # Format price as currency
+                    s_col1.caption(f"Price: ₹{stock.get('Price', 0.0):,.2f}")
+                    # Display percentage change
+                    s_col2.markdown(f"<span style='color:{color}; font-weight:bold;'>{change_pct:+.2f}%</span>", unsafe_allow_html=True)
+                    # Add expander for details/trade
+                    with st.expander("Details / Trade"):
+                        # Prepare stock_data dict needed by render_stock_details_popup
+                        # It needs 'Price' and 'Change %' (which is 'Change' in its context)
+                        # We don't have 'Cap' from search, so it will be omitted
+                        popup_stock_data = {
+                            "Ticker": stock.get('Ticker', 'N/A'),
+                            "Name": stock.get('Name', 'Unknown Name'),
+                            "Price": stock.get('Price', 0.0),
+                            "Change": stock.get('Change %', 0.0) # Pass Change % as 'Change'
+                        }
+                        render_stock_details_popup(popup_stock_data)
+
+        st.markdown("---") # Separator after search results
 
     # --- Movers Section ---
     st.subheader("Today's Movers (Simulated)")
-    cap_options = ["All", "Large-Cap", "Mid-Cap", "Small-Cap"]
+    cap_options = ["LargeCap", "MidCap", "SmallCap"]
     default_cap_index = 0
     try:
         default_cap_index = cap_options.index(st.session_state.home_market_cap_filter)
     except ValueError:
-        st.session_state.home_market_cap_filter = "All"
+        st.session_state.home_market_cap_filter = "LargeCap" # Default to LargeCap if not found
 
     selected_cap = st.radio(
         "Filter by Market Cap:",
@@ -1199,7 +1129,8 @@ def render_home():
     if selected_cap != st.session_state.home_market_cap_filter:
         st.session_state.home_market_cap_filter = selected_cap
         st.rerun()
-
+        
+    gainers, losers = get_tickertape_movers(universe=st.session_state.home_market_cap_filter, count=5) # Fetch top 5
     # Display Gainers/Losers
     col1, col2 = st.columns(2)
     with col1:
@@ -1212,7 +1143,7 @@ def render_home():
                 s_col1.caption(f"Price: ${stock['Price']:.2f}")
                 s_col2.markdown(f"<span style='color:green; font-weight:bold;'>+{stock['Change']:.1f}%</span>", unsafe_allow_html=True)
                 with st.expander("Details / Trade"):
-                     render_stock_details_popup(stock['Ticker'])
+                     render_stock_details_popup(stock)
     with col2:
         st.markdown("#### Top Losers")
         if not losers: st.caption(f"No losers found for '{st.session_state.home_market_cap_filter}' filter.")
@@ -1223,7 +1154,7 @@ def render_home():
                 s_col1.caption(f"Price: ${stock['Price']:.2f}")
                 s_col2.markdown(f"<span style='color:red; font-weight:bold;'>{stock['Change']:.1f}%</span>", unsafe_allow_html=True)
                 with st.expander("Details / Trade"):
-                     render_stock_details_popup(stock['Ticker'])
+                     render_stock_details_popup(stock)
 
 # --- Paper Trading Page Rendering ---
 def render_paper_trade():
