@@ -171,7 +171,12 @@ def lynch_fundamentals(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
         ocf_list = [p.get(ocf_field) for p in cash_flow.values() if p.get(ocf_field) is not None]
 
         fcf_latest = ocf_list[0] if ocf_list else None
-        fcf_margin = (fcf_latest / net_sales) * 100 if net_sales else None
+        fcf_margin = (
+          (fcf_latest / net_sales * 100) 
+          if fcf_latest is not None 
+            and net_sales not in (None, 0) 
+            and isinstance(net_sales, (int, float))
+          else None)
 
         values = {
             "Debt-to-Equity": round(de_ratio, 2),
