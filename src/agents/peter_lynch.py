@@ -1,12 +1,11 @@
 import json
-import statistics
 from typing import Any, Dict, TypedDict, Optional, Tuple
 from src.data_source.market_apis import get_overall_fundamental_data
 from src.llm.models import get_model
 from langgraph.types import Command
 from langgraph.graph import StateGraph, START, END
 from utils.app_logger import setup_logger
-from src.prompts import fundamental_agent_system_prompt
+from src.prompts import peter_lynch_system_prompt
 import math
 
 from utils.llm import parse_fundamental_response
@@ -400,12 +399,7 @@ def run_financial_analysis(symbol: str, fundamental_data: Dict[str, Any]) -> Dic
     }
 
     try:
-        # Stream events to see the flow
-        # print("\n--- Graph Execution Stream ---")
-        # for event in financial_analysis_graph.stream(initial_state, config=config):
-        #     # print(event)
-        #     pass # Process events if needed
-        # print("--- End Graph Execution Stream ---\n")
+
 
         # Or just invoke to get the final state
         final_state = financial_analysis_graph.invoke(initial_state, config=config)
@@ -465,14 +459,9 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 
     # Prepare messages for LLM
     messages = [
-        {
-            "role": "system",
-            "content": fundamental_agent_system_prompt # Ensure this prompt asks for JSON output
-        },
-        {
-            "role": "user",
-            "content": f"Please perform a comprehensive fundamental analysis for {symbol} based on the following calculated metrics (including parameters, Z-scores relative to typical ranges, points awarded [0-2], confidence levels, and signals). Provide a summary of the company's financial health across operating efficiency, profitability, leverage, and stability. Conclude with an overall investment recommendation (e.g., BULLISH, BEARISH, NEUTRAL) and rationale. Ensure the final output is a single JSON object.\n\nAnalysis Metrics:\n{json.dumps(filtered_results, indent=2)}"
-        }
+
+        {"role": "system", "content": peter_lynch_system_prompt},
+        {"role": "user", "content": f"Analyze these Lynch metrics for {symbol}:\n{json.dumps(analysis_results, indent=2)}"}
     ]
 
     try:
@@ -481,7 +470,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         response = chat_model.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
-            temperature=0.5, # Slightly lower temp for more factual summary
+            temperature=0.7, # Slightly lower temp for more factual summary
             response_format=FORMAT # Request JSON output
         )
         logger.info(f"Received LLM response for {symbol}.")
@@ -499,5 +488,5 @@ if __name__ == "__main__":
     # or that get_overall_fundamental_data can fetch it.
     symbol_to_test = "RELIANCE"
     print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
-    analysis_report_json = peter_lynch_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
+    analysis_report_json = peter_lynch_agent(symbol_to_test, exchange="nse", force=False, refresh_days=30) # Increase refresh days for testing
     print(analysis_report_json)
