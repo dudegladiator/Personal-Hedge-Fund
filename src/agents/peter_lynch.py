@@ -461,7 +461,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
     messages = [
         {
             "role": "system",
-            "content": fundamental_agent_system_prompt # Ensure this prompt asks for JSON output
+            "content": peter_lynch_system_prompt # Ensure this prompt asks for JSON output
         },
         {
             "role": "user",
