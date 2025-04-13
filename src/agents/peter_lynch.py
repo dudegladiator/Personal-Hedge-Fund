@@ -1,12 +1,11 @@
 import json
-import statistics
 from typing import Any, Dict, TypedDict, Optional, Tuple
 from src.data_source.market_apis import get_overall_fundamental_data
 from src.llm.models import get_model
 from langgraph.types import Command
 from langgraph.graph import StateGraph, START, END
 from utils.app_logger import setup_logger
-from src.prompts import fundamental_agent_system_prompt
+from src.prompts import peter_lynch_system_prompt
 import math
 
 from utils.llm import parse_fundamental_response
@@ -400,12 +399,7 @@ def run_financial_analysis(symbol: str, fundamental_data: Dict[str, Any]) -> Dic
     }
 
     try:
-        # Stream events to see the flow
-        # print("\n--- Graph Execution Stream ---")
-        # for event in financial_analysis_graph.stream(initial_state, config=config):
-        #     # print(event)
-        #     pass # Process events if needed
-        # print("--- End Graph Execution Stream ---\n")
+
 
         # Or just invoke to get the final state
         final_state = financial_analysis_graph.invoke(initial_state, config=config)
@@ -481,7 +475,7 @@ def peter_lynch_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         response = chat_model.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
-            temperature=0.5, # Slightly lower temp for more factual summary
+            temperature=0.7, # Slightly lower temp for more factual summary
             response_format=FORMAT # Request JSON output
         )
         logger.info(f"Received LLM response for {symbol}.")

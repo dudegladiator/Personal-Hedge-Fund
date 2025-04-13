@@ -3,12 +3,10 @@ import statistics
 from typing import Any, Dict, TypedDict, Optional, Tuple
 from src.data_source.market_apis import get_overall_fundamental_data
 from src.llm.models import get_model
-from langgraph.types import Command
 from langgraph.graph import StateGraph, START, END
 from utils.app_logger import setup_logger
 from src.prompts import fundamental_agent_system_prompt
 import math
-
 from utils.llm import parse_fundamental_response
 
 logger = setup_logger("src/agents/fundamental_agent.py")
@@ -582,12 +580,6 @@ def run_financial_analysis(symbol: str, fundamental_data: Dict[str, Any]) -> Dic
     }
 
     try:
-        # Stream events to see the flow
-        # print("\n--- Graph Execution Stream ---")
-        # for event in financial_analysis_graph.stream(initial_state, config=config):
-        #     # print(event)
-        #     pass # Process events if needed
-        # print("--- End Graph Execution Stream ---\n")
 
         # Or just invoke to get the final state
         final_state = financial_analysis_graph.invoke(initial_state, config=config)
@@ -611,18 +603,6 @@ def run_financial_analysis(symbol: str, fundamental_data: Dict[str, Any]) -> Dic
 
 
 def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, refresh_days: int = 7) -> str:
-    """
-    Creates a financial analysis agent using LangGraph subgraph, Z-scores, and LLM summarization.
-
-    Args:
-        symbol: Stock symbol to analyze.
-        exchange: Stock exchange.
-        force: Force refresh of data.
-        refresh_days: Refresh data if older than this many days.
-
-    Returns:
-        JSON string containing the analysis report from the LLM or an error message.
-    """
     logger.info(f"Starting fundamental agent for {symbol} on {exchange}...")
     # Get fundamental data from database
     fundamental_data = get_overall_fundamental_data(symbol=symbol, exchange=exchange, force=force, refresh_days=refresh_days)
@@ -678,8 +658,6 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         return {"error": f"An error occurred during LLM interaction: {str(e)}"}
 
 if __name__ == "__main__":
-    # Use a common symbol for testing, ensure you have data for it
-    # or that get_overall_fundamental_data can fetch it.
     symbol_to_test = "REDINGTON"
     print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
     analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
