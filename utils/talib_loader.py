@@ -11,7 +11,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # !! Adjust path if your structure is different !!
 INCLUDE_DIR = os.path.join(PROJECT_ROOT, 'lib', 'talib', 'include') # Dir containing ta_defs.h
 LIB_DIR = os.path.join(PROJECT_ROOT, 'lib', 'talib', 'lib')         # Dir containing libta_lib.so.0
-LIB_FILE_CHECK = os.path.join(LIB_DIR, 'libta_lib.so.0')          # Specific file to check
+LIB_FILE_CHECK = os.path.join(LIB_DIR, 'libta-lib.so.0')          # Specific file to check
 HEADER_FILE_CHECK = os.path.join(INCLUDE_DIR, 'ta_defs.h')        # Specific header to check
 
 # --- Check Pre-compiled Library and Headers ---
