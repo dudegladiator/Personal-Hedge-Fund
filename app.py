@@ -14,6 +14,15 @@ from src.data_source.apis_2 import get_live_indices_pricing
 from src.data_source.apis_3 import get_tickertape_movers, search_tickertape_stocks
 from src.routers.auth import authenticate_user
 from src.routers.trading import add_funds_to_portfolio, execute_paper_trade, get_detailed_paper_portfolio, get_paper_portfolio, get_paper_transactions
+from src.agents.fundamental_agent import fundamental_agent
+from src.agents.sentimental_agent import sentimental_agent
+
+# Try to import backtesting_agent, but don't fail if it's not available
+try:
+    from src.agents.backtesting_agent import backtesting_agent
+    BACKTESTING_AVAILABLE = True
+except ImportError:
+    BACKTESTING_AVAILABLE = False
 import utils.runner
 
 # --- Constants ---
@@ -23,6 +32,7 @@ PAGE_DASHBOARD = "dashboard"
 PAGE_NEW_ANALYSIS = "new_analysis"
 PAGE_JOB_STATUS = "job_status"
 PAGE_PAPER_TRADE = "paper_trade" # New Paper Trading Page
+PAGE_STOCK_RESEARCH = "stock_research" # New Stock Research Page
 LOGIN_COOKIE_NAME = "ai_hedge_fund_user_session" # Choose a name
 COOKIE_EXPIRY_DAYS = 7 # How long the login persists
 
@@ -207,13 +217,14 @@ def display_sidebar():
     st.sidebar.button("➕ Start New Analysis", on_click=navigate_to, args=(PAGE_NEW_ANALYSIS, None, True), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_NEW_ANALYSIS else "secondary")
     st.sidebar.button("📊 View Analysis Jobs", on_click=navigate_to, args=(PAGE_JOB_STATUS, None, True), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_JOB_STATUS else "secondary")
     st.sidebar.button("📄 Paper Trading", on_click=navigate_to, args=(PAGE_PAPER_TRADE, None, False), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_PAPER_TRADE else "secondary") # Don't clear proposed trades when going here
-    
+    st.sidebar.button("🔍 Stock Research", on_click=navigate_to, args=(PAGE_STOCK_RESEARCH, None, True), use_container_width=True, type="primary" if st.session_state.current_page == PAGE_STOCK_RESEARCH else "secondary")
+
     st.sidebar.markdown("---") # Separator
 
     # --- Refresh Button ---
     if st.sidebar.button("🔄 Refresh Data", use_container_width=True, key="manual_refresh"):
         st.rerun() # Trigger a full rerun to refresh data
-        
+
     st.sidebar.markdown("---")
     st.sidebar.button("🚪 Logout", on_click=logout, use_container_width=True)
 
@@ -870,7 +881,7 @@ def render_stock_details_popup(stock_data: dict):
         delta_color = "inverse" # Streamlit's default red
 
     col2.metric("Day's Change", f"{day_change_pct:+.2f}%", delta_color=delta_color)
-    
+
     # Paper Trade Button
     st.subheader("Paper Trade Actions")
     username = st.session_state.logged_in_user
@@ -946,7 +957,7 @@ def render_stock_details_popup(stock_data: dict):
 
 def render_home():
     st.title("📈 Market Overview")
- 
+
     # --- Indices ---
     st.subheader("Indices")
     indices = get_live_indices_pricing()
@@ -1052,7 +1063,7 @@ def render_home():
     if selected_cap != st.session_state.home_market_cap_filter:
         st.session_state.home_market_cap_filter = selected_cap
         st.rerun()
-        
+
     gainers, losers = get_tickertape_movers(universe=st.session_state.home_market_cap_filter, count=5) # Fetch top 5
     # Display Gainers/Losers
     col1, col2 = st.columns(2)
@@ -1079,12 +1090,230 @@ def render_home():
                 with st.expander("Details / Trade"):
                      render_stock_details_popup(stock)
 
+# --- Stock Research Page Rendering ---
+def render_stock_research():
+    st.title("🔍 Stock Research")
+    st.markdown("Enter a stock name or ticker symbol to get comprehensive analysis from our AI agents.")
+
+    # Input form for stock symbol
+    with st.form("stock_research_form"):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            stock_input = st.text_input("Stock Symbol or Name", placeholder="e.g., AAPL, MSFT, RELIANCE")
+        with col2:
+            exchange = st.selectbox("Exchange", options=["nse", "bse"], index=0)
+
+        submitted = st.form_submit_button("Analyze Stock", use_container_width=True)
+
+    # Process form submission
+    if submitted and stock_input:
+        stock_symbol = stock_input.strip().upper()
+
+        # Create tabs for different analyses
+        tab1, tab2, tab3 = st.tabs(["Fundamental Analysis", "Sentiment Analysis", "Backtesting Analysis"])
+
+        # Check for MongoDB connection issues
+        try:
+            # Test MongoDB connection by trying to get a simple document
+            from utils.config import get_sync_database
+            db = get_sync_database()
+            # Just try to access a collection to see if connection works
+            _ = db.list_collection_names()
+            mongodb_available = True
+        except Exception as e:
+            mongodb_available = False
+            st.warning("⚠️ MongoDB connection is not available. Using simulated data for demonstration purposes.")
+
+        with st.spinner(f"Analyzing {stock_symbol}..."):
+            # Run analyses in parallel (in a real app, you might want to add caching)
+            with tab1:
+                st.subheader(f"Fundamental Analysis for {stock_symbol}")
+                try:
+                    if mongodb_available:
+                        fundamental_results = fundamental_agent(symbol=stock_symbol, exchange=exchange)
+                        if isinstance(fundamental_results, str):
+                            try:
+                                fundamental_results = json.loads(fundamental_results)
+                            except json.JSONDecodeError:
+                                fundamental_results = {"error": "Failed to parse results"}
+                    else:
+                        # Simulate fundamental analysis results
+                        fundamental_results = {
+                            "recommendation": random.choice(["BULLISH", "BEARISH", "NEUTRAL"]),
+                            "confidence_score": round(random.uniform(0.5, 0.9), 2),
+                            "rationale": f"Simulated analysis for {stock_symbol}. This is demo data since MongoDB is not available.",
+                            "metrics": {
+                                "Valuation": {
+                                    "P/E Ratio": round(random.uniform(10, 30), 2),
+                                    "P/B Ratio": round(random.uniform(1, 5), 2),
+                                    "Dividend Yield": f"{round(random.uniform(0, 5), 2)}%"
+                                },
+                                "Financial Health": {
+                                    "Debt-to-Equity": round(random.uniform(0.1, 2.0), 2),
+                                    "Current Ratio": round(random.uniform(0.8, 3.0), 2),
+                                    "ROE": f"{round(random.uniform(5, 25), 2)}%"
+                                }
+                            }
+                        }
+
+                    if fundamental_results.get("error"):
+                        st.error(f"Error in fundamental analysis: {fundamental_results.get('error')}")
+                    else:
+                        # Display the recommendation
+                        recommendation = fundamental_results.get("recommendation", "NEUTRAL")
+                        confidence = fundamental_results.get("confidence_score", 0.5)
+
+                        # Color based on recommendation
+                        color = "green" if recommendation == "BULLISH" else "red" if recommendation == "BEARISH" else "orange"
+
+                        st.markdown(f"<h3 style='color:{color};'>Recommendation: {recommendation}</h3>", unsafe_allow_html=True)
+                        st.progress(confidence, text=f"Confidence: {confidence:.2f}")
+
+                        # Display rationale
+                        st.subheader("Analysis Rationale")
+                        st.markdown(fundamental_results.get("rationale", "No rationale provided."))
+
+                        # Display detailed metrics if available
+                        if "metrics" in fundamental_results:
+                            st.subheader("Key Metrics")
+                            metrics = fundamental_results["metrics"]
+                            for category, values in metrics.items():
+                                with st.expander(f"{category} Metrics"):
+                                    for key, value in values.items():
+                                        st.metric(key, value)
+                except Exception as e:
+                    st.error(f"Error running fundamental analysis: {str(e)}")
+
+            with tab2:
+                st.subheader(f"Sentiment Analysis for {stock_symbol}")
+                try:
+                    if mongodb_available:
+                        sentiment_results = sentimental_agent(symbol=stock_symbol, exchange=exchange)
+                    else:
+                        # Simulate sentiment analysis results
+                        news_recommendation = random.choice(["BULLISH", "BEARISH", "NEUTRAL"])
+                        announcement_recommendation = random.choice(["BULLISH", "BEARISH", "NEUTRAL"])
+                        sentiment_results = {
+                            "symbol": stock_symbol,
+                            "exchange": exchange,
+                            "news_analysis": {
+                                "recommendation_sign": news_recommendation,
+                                "recommendation_confidence_score": round(random.uniform(0.5, 0.9), 2),
+                                "analysis_overview": f"Simulated news analysis for {stock_symbol}. Recent news articles suggest a {news_recommendation.lower()} outlook."
+                            },
+                            "announcement_analysis": {
+                                "recommendation_sign": announcement_recommendation,
+                                "recommendation_confidence_score": round(random.uniform(0.5, 0.9), 2),
+                                "analysis_overview": f"Simulated announcement analysis for {stock_symbol}. Recent corporate announcements indicate a {announcement_recommendation.lower()} trend."
+                            },
+                            "error": False
+                        }
+
+                    if sentiment_results.get("error"):
+                        st.error(f"Error in sentiment analysis: {sentiment_results.get('message')}")
+                    else:
+                        # Display news analysis
+                        st.subheader("News Analysis")
+                        news_analysis = sentiment_results.get("news_analysis", {})
+                        news_recommendation = news_analysis.get("recommendation_sign", "NEUTRAL")
+                        news_confidence = news_analysis.get("recommendation_confidence_score", 0.5)
+
+                        # Color based on recommendation
+                        news_color = "green" if news_recommendation == "BULLISH" else "red" if news_recommendation == "BEARISH" else "orange"
+                        st.markdown(f"<h4 style='color:{news_color};'>News Sentiment: {news_recommendation}</h4>", unsafe_allow_html=True)
+                        st.progress(news_confidence, text=f"Confidence: {news_confidence:.2f}")
+                        st.markdown(news_analysis.get("analysis_overview", "No analysis available."))
+
+                        # Display announcement analysis
+                        st.subheader("Announcements Analysis")
+                        announcement_analysis = sentiment_results.get("announcement_analysis", {})
+                        announcement_recommendation = announcement_analysis.get("recommendation_sign", "NEUTRAL")
+                        announcement_confidence = announcement_analysis.get("recommendation_confidence_score", 0.5)
+
+                        # Color based on recommendation
+                        announcement_color = "green" if announcement_recommendation == "BULLISH" else "red" if announcement_recommendation == "BEARISH" else "orange"
+                        st.markdown(f"<h4 style='color:{announcement_color};'>Announcements Sentiment: {announcement_recommendation}</h4>", unsafe_allow_html=True)
+                        st.progress(announcement_confidence, text=f"Confidence: {announcement_confidence:.2f}")
+                        st.markdown(announcement_analysis.get("analysis_overview", "No analysis available."))
+                except Exception as e:
+                    st.error(f"Error running sentiment analysis: {str(e)}")
+
+            with tab3:
+                st.subheader(f"Backtesting Analysis for {stock_symbol}")
+                try:
+                    if mongodb_available and BACKTESTING_AVAILABLE:
+                        with st.spinner("Running backtesting analysis... This may take a few minutes."):
+                            backtesting_results = backtesting_agent(symbol=stock_symbol, exchange=exchange)
+                    elif not BACKTESTING_AVAILABLE:
+                        st.warning("Backtesting module is not available. The 'talib' package is required for backtesting.")
+                        # Continue with simulated data
+                    else:
+                        # Simulate backtesting results
+                        strategies = ["Moving Average Crossover", "RSI Strategy", "MACD Strategy"]
+                        backtesting_results = {
+                            "executive_summary": f"Simulated backtesting analysis for {stock_symbol}. This is demo data since MongoDB is not available.",
+                            "detailed_analysis": {}
+                        }
+
+                        for strategy in strategies:
+                            total_return = round(random.uniform(-10, 30), 2)
+                            sharpe = round(random.uniform(0.2, 1.8), 2)
+                            drawdown = round(random.uniform(-25, -5), 2)
+
+                            backtesting_results["detailed_analysis"][strategy] = {
+                                "metrics": {
+                                    "total_return": total_return,
+                                    "sharpe_ratio": sharpe,
+                                    "max_drawdown": drawdown
+                                },
+                                "analysis": f"The {strategy} strategy showed a total return of {total_return}% with a Sharpe ratio of {sharpe}. The maximum drawdown was {drawdown}%.",
+                                "recommendations": f"Based on the {strategy} strategy performance, this stock appears to be {'promising' if total_return > 10 else 'average' if total_return > 0 else 'risky'} for investment."
+                            }
+
+                    if backtesting_results.get("error"):
+                        st.error(f"Error in backtesting analysis: {backtesting_results.get('details')}")
+                    else:
+                        # Display executive summary
+                        st.subheader("Executive Summary")
+                        st.markdown(backtesting_results.get("executive_summary", "No summary available."))
+
+                        # Display detailed analysis for each strategy
+                        st.subheader("Strategy Analysis")
+                        strategies = backtesting_results.get("detailed_analysis", {})
+
+                        if strategies:
+                            for strategy_name, analysis in strategies.items():
+                                with st.expander(f"Strategy: {strategy_name}"):
+                                    # Display strategy metrics
+                                    metrics_cols = st.columns(3)
+                                    metrics = analysis.get("metrics", {})
+                                    if metrics:
+                                        metrics_cols[0].metric("Total Return", f"{metrics.get('total_return', 0):.2f}%")
+                                        metrics_cols[1].metric("Sharpe Ratio", f"{metrics.get('sharpe_ratio', 0):.2f}")
+                                        metrics_cols[2].metric("Max Drawdown", f"{metrics.get('max_drawdown', 0):.2f}%")
+
+                                    # Display strategy analysis
+                                    st.markdown("#### Analysis")
+                                    st.markdown(analysis.get("analysis", "No analysis available."))
+
+                                    # Display strategy recommendations
+                                    st.markdown("#### Recommendations")
+                                    st.markdown(analysis.get("recommendations", "No recommendations available."))
+                        else:
+                            st.info("No strategy analysis available.")
+                except Exception as e:
+                    st.error(f"Error running backtesting analysis: {str(e)}")
+                    if "talib" in str(e).lower():
+                        st.warning("The 'talib' package is required for backtesting. Please install the required dependencies by running: `pip install ta-lib-bin==0.4.26` or follow the installation instructions in the project documentation.")
+    elif submitted:
+        st.warning("Please enter a stock symbol or name.")
+
 # --- Paper Trading Page Rendering ---
 def render_paper_trade():
     st.title("📄 Paper Trading Portfolio")
     username = st.session_state.logged_in_user
     portfolio_details = get_detailed_paper_portfolio(username) # Use new function
-    
+
     # Check for portfolio fetch error
     if portfolio_details.get("error"):
         st.error(f"Error loading portfolio: {portfolio_details['error']}")
@@ -1410,6 +1639,7 @@ elif page == PAGE_DASHBOARD: render_dashboard()
 elif page == PAGE_NEW_ANALYSIS: render_new_analysis()
 elif page == PAGE_JOB_STATUS: render_job_status()
 elif page == PAGE_PAPER_TRADE: render_paper_trade()
+elif page == PAGE_STOCK_RESEARCH: render_stock_research()
 else:
     st.session_state.current_page = PAGE_HOME # Default to Home
     render_home()
