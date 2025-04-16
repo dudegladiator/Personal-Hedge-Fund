@@ -17,8 +17,8 @@ yfinance==0.2.54
 nsepythonserver==2.93
 requests-ratelimiter==0.7.0
 pandas==2.2.3
-numpy==2.2.4
-# ta-lib
+numpy==1.26.4
+TA-Lib-Precompiled
 
 
 streamlit==1.44.0
