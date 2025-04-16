@@ -118,6 +118,12 @@ def backtesting_agent(
         # Generate strategy code
         strategy_response = generate_strategy_code(symbol, exchange, force=force)
         strategy_response = strategy_response.get("strategies")
+        if not strategy_response:
+            logger.error(f"Strategy generation failed for {symbol}: {strategy_response}")
+            return {
+                "error": True,
+                "details": strategy_response,
+            }
         # Test all strategies
         all_results = []
         for i, strategy_code in enumerate(strategy_response, 1):
@@ -176,11 +182,11 @@ if __name__ == "__main__":
         # "AXISBANK",
         # "HEROMOTOCO",
         # "HAL",
-        "UNITDSPR",
+        # "UNITDSPR",
         # "TATAMOTORS",
         # "NTPC",
         # "BAJAJFINSV",
-        # "RELIANCE"
+        "RELIANCE"
     ]
     for stock_code in stock_codes:
         result = backtesting_agent(

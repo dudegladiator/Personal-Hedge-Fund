@@ -666,7 +666,7 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
 
 if __name__ == "__main__":
     stock_codes = [
-        "INDUSINDBK",
+        # "INDUSINDBK",
         # "PATANJALI",
         # "ITC",
         # "AMBUJACEM",
@@ -677,7 +677,7 @@ if __name__ == "__main__":
         # "TATAMOTORS",
         # "NTPC",
         # "BAJAJFINSV",
-        # "RELIANCE"
+        "RELIANCE"
     ]
     for stock in stock_codes:
         print(f"Running analysis for {stock}...")

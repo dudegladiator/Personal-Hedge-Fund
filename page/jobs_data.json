@@ -1,0 +1,2356 @@
+{
+    "alice": {
+        "job_e674f06e": {
+            "id": "job_e674f06e",
+            "user": "alice",
+            "inputs": {
+                "budget": 25000,
+                "risk_score": 60,
+                "sectors": [],
+                "market_caps": [
+                    "Mid",
+                    "Large"
+                ],
+                "instructions": "zsdvdrfrfdvdrfdf"
+            },
+            "status": "\u2705 Completed",
+            "current_step": "Complete",
+            "submitted_at": "2025-04-01T01:26:56.890277",
+            "started_at": "2025-04-01T01:26:57.943229",
+            "completed_at": "2025-04-01T01:27:29.235691",
+            "progress_log": [
+                "[2025-04-01 01:26:56] Job created and queued.",
+                "[01:26:57] Job started.",
+                "[01:26:58] Starting Screening...",
+                "[01:26:59] Screening complete. Found 11 tickers.",
+                "[01:26:59] Starting Fundamental Analysis for 11 tickers...",
+                "[01:27:02] Fundamental Analysis complete. 8 stocks passed.",
+                "[01:27:02] Starting Sentiment Analysis for 8 tickers...",
+                "[01:27:04] Sentiment Analysis complete. 8 stocks passed.",
+                "[01:27:05] Starting Technical Analysis for 8 tickers...",
+                "[01:27:09] Technical Analysis complete. 8 stocks passed.",
+                "[01:27:17] Starting Strategy Development for 8 tickers...",
+                "[01:27:24] Strategy Development complete for 8 stocks.",
+                "[01:27:26] Starting Final Portfolio Selection...",
+                "[01:27:29] Final Portfolio Selection complete."
+            ],
+            "results": {
+                "Screening": {
+                    "screening_data": [
+                        {
+                            "Ticker": "BAC",
+                            "Sector": "Finance",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 72.2
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "Sector": "Technology",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 58.9
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 62.5
+                        },
+                        {
+                            "Ticker": "META",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 79.9
+                        },
+                        {
+                            "Ticker": "CVX",
+                            "Sector": "Energy",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 89.6
+                        },
+                        {
+                            "Ticker": "PG",
+                            "Sector": "Consumer Staples",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 58.8
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 96.1
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 86.4
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "Sector": "Consumer Staples",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 74.3
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "Sector": "Finance",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 82.3
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 65.4
+                        }
+                    ],
+                    "passing_tickers": [
+                        "BAC",
+                        "RBLX",
+                        "GME",
+                        "META",
+                        "CVX",
+                        "PG",
+                        "AAPL",
+                        "PFE",
+                        "WMT",
+                        "BRK-B",
+                        "SAVA"
+                    ]
+                },
+                "Fundamental Analysis": {
+                    "fundamental_data": [
+                        {
+                            "Ticker": "RBLX",
+                            "P/E Ratio": 41.91,
+                            "ROE (%)": 20.84,
+                            "Debt/Equity": 0.14,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "GME",
+                            "P/E Ratio": 49.24,
+                            "ROE (%)": 7.12,
+                            "Debt/Equity": 0.78,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 2.8
+                        },
+                        {
+                            "Ticker": "META",
+                            "P/E Ratio": 38.52,
+                            "ROE (%)": 19.1,
+                            "Debt/Equity": 0.14,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "PG",
+                            "P/E Ratio": 23.38,
+                            "ROE (%)": 14.08,
+                            "Debt/Equity": 1.3,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 3.01
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "P/E Ratio": 17.2,
+                            "ROE (%)": 11.67,
+                            "Debt/Equity": 0.89,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 1.79
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "P/E Ratio": 12.86,
+                            "ROE (%)": 18.48,
+                            "Debt/Equity": 0.8,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "P/E Ratio": 30.78,
+                            "ROE (%)": 24.13,
+                            "Debt/Equity": 0.12,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "P/E Ratio": 29.9,
+                            "ROE (%)": 23.22,
+                            "Debt/Equity": 0.97,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.0
+                        }
+                    ],
+                    "passing_tickers": [
+                        "RBLX",
+                        "GME",
+                        "META",
+                        "PG",
+                        "AAPL",
+                        "PFE",
+                        "WMT",
+                        "BRK-B"
+                    ]
+                },
+                "Sentiment Analysis": {
+                    "sentiment_data": [
+                        {
+                            "Ticker": "RBLX",
+                            "Sentiment Score": -0.26,
+                            "Trending Keywords": "Growth, Competition, Earnings",
+                            "News Volume (24h)": 29,
+                            "Social Media Buzz": "Medium"
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Sentiment Score": 0.21,
+                            "Trending Keywords": "New Product",
+                            "News Volume (24h)": 14,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "META",
+                            "Sentiment Score": 0.05,
+                            "Trending Keywords": "New Product, Regulations, Competition",
+                            "News Volume (24h)": 40,
+                            "Social Media Buzz": "Medium"
+                        },
+                        {
+                            "Ticker": "PG",
+                            "Sentiment Score": -0.03,
+                            "Trending Keywords": "Growth, New Product, Earnings",
+                            "News Volume (24h)": 44,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Sentiment Score": -0.07,
+                            "Trending Keywords": "Earnings, Regulations, Competition",
+                            "News Volume (24h)": 20,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "Sentiment Score": 0.32,
+                            "Trending Keywords": "AI",
+                            "News Volume (24h)": 14,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "Sentiment Score": 0.61,
+                            "Trending Keywords": "AI, Growth",
+                            "News Volume (24h)": 17,
+                            "Social Media Buzz": "Medium"
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "Sentiment Score": 0.59,
+                            "Trending Keywords": "AI",
+                            "News Volume (24h)": 30,
+                            "Social Media Buzz": "High"
+                        }
+                    ],
+                    "passing_tickers": [
+                        "RBLX",
+                        "GME",
+                        "META",
+                        "PG",
+                        "AAPL",
+                        "PFE",
+                        "WMT",
+                        "BRK-B"
+                    ]
+                },
+                "Technical Analysis": {
+                    "technical_data": [
+                        {
+                            "Ticker": "RBLX",
+                            "RSI (14)": 68.3,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 3.27
+                        },
+                        {
+                            "Ticker": "GME",
+                            "RSI (14)": 31.1,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 3.55
+                        },
+                        {
+                            "Ticker": "META",
+                            "RSI (14)": 66.7,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 1.62
+                        },
+                        {
+                            "Ticker": "PG",
+                            "RSI (14)": 31.3,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 1.97
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "RSI (14)": 68.1,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 3.54
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "RSI (14)": 40.0,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 3.09
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "RSI (14)": 47.6,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 4.85
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "RSI (14)": 41.7,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 3.86
+                        }
+                    ],
+                    "passing_tickers": [
+                        "RBLX",
+                        "GME",
+                        "META",
+                        "PG",
+                        "AAPL",
+                        "PFE",
+                        "WMT",
+                        "BRK-B"
+                    ]
+                },
+                "Strategy Development": {
+                    "strategies_per_stock": {
+                        "RBLX": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 8.22,
+                                    "Volatility (%)": 22.85,
+                                    "Sharpe Ratio": 1.38
+                                }
+                            },
+                            {
+                                "strategy_name": "Momentum #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 20.4,
+                                    "Volatility (%)": 13.47,
+                                    "Sharpe Ratio": 0.78
+                                }
+                            }
+                        ],
+                        "GME": [
+                            {
+                                "strategy_name": "Dividend Growth #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 14.29,
+                                    "Volatility (%)": 21.47,
+                                    "Sharpe Ratio": 0.69
+                                }
+                            },
+                            {
+                                "strategy_name": "Volatility Breakout #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 13.89,
+                                    "Volatility (%)": 19.88,
+                                    "Sharpe Ratio": 1.29
+                                }
+                            }
+                        ],
+                        "META": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 11.5,
+                                    "Volatility (%)": 11.83,
+                                    "Sharpe Ratio": 0.58
+                                }
+                            },
+                            {
+                                "strategy_name": "Value Dip Buy #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 22.28,
+                                    "Volatility (%)": 23.26,
+                                    "Sharpe Ratio": 0.61
+                                }
+                            }
+                        ],
+                        "PG": [
+                            {
+                                "strategy_name": "MA Crossover #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.98,
+                                    "Volatility (%)": 17.59,
+                                    "Sharpe Ratio": 1.21
+                                }
+                            },
+                            {
+                                "strategy_name": "Dividend Growth #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 12.61,
+                                    "Volatility (%)": 28.07,
+                                    "Sharpe Ratio": 1.1
+                                }
+                            }
+                        ],
+                        "AAPL": [
+                            {
+                                "strategy_name": "Volatility Breakout #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.87,
+                                    "Volatility (%)": 20.77,
+                                    "Sharpe Ratio": 1.26
+                                }
+                            },
+                            {
+                                "strategy_name": "MA Crossover #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 10.13,
+                                    "Volatility (%)": 11.88,
+                                    "Sharpe Ratio": 1.32
+                                }
+                            }
+                        ],
+                        "PFE": [
+                            {
+                                "strategy_name": "Mean Reversion #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 5.81,
+                                    "Volatility (%)": 27.3,
+                                    "Sharpe Ratio": 0.53
+                                }
+                            }
+                        ],
+                        "WMT": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 9.77,
+                                    "Volatility (%)": 25.53,
+                                    "Sharpe Ratio": 1.37
+                                }
+                            }
+                        ],
+                        "BRK-B": [
+                            {
+                                "strategy_name": "Mean Reversion #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.82,
+                                    "Volatility (%)": 17.97,
+                                    "Sharpe Ratio": 1.11
+                                }
+                            }
+                        ]
+                    },
+                    "final_stock_list": [
+                        "RBLX",
+                        "GME",
+                        "META",
+                        "PG",
+                        "AAPL",
+                        "PFE",
+                        "WMT",
+                        "BRK-B"
+                    ]
+                },
+                "Final Portfolio Selection": {
+                    "final_portfolio": [
+                        {
+                            "Ticker": "WMT",
+                            "Chosen Strategy": "Value Dip Buy #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 9.77,
+                            "Volatility (%)": 25.53,
+                            "Sharpe Ratio": 1.37,
+                            "Allocation (%)": 14.26
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Chosen Strategy": "Volatility Breakout #2",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 13.89,
+                            "Volatility (%)": 19.88,
+                            "Sharpe Ratio": 1.29,
+                            "Allocation (%)": 14.29
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Chosen Strategy": "MA Crossover #2",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 10.13,
+                            "Volatility (%)": 11.88,
+                            "Sharpe Ratio": 1.32,
+                            "Allocation (%)": 14.29
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "Chosen Strategy": "Mean Reversion #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 5.81,
+                            "Volatility (%)": 27.3,
+                            "Sharpe Ratio": 0.53,
+                            "Allocation (%)": 14.29
+                        },
+                        {
+                            "Ticker": "META",
+                            "Chosen Strategy": "Value Dip Buy #2",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 22.28,
+                            "Volatility (%)": 23.26,
+                            "Sharpe Ratio": 0.61,
+                            "Allocation (%)": 14.29
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "Chosen Strategy": "Value Dip Buy #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 8.22,
+                            "Volatility (%)": 22.85,
+                            "Sharpe Ratio": 1.38,
+                            "Allocation (%)": 14.29
+                        },
+                        {
+                            "Ticker": "PG",
+                            "Chosen Strategy": "MA Crossover #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 16.98,
+                            "Volatility (%)": 17.59,
+                            "Sharpe Ratio": 1.21,
+                            "Allocation (%)": 14.29
+                        }
+                    ]
+                }
+            },
+            "error_message": null
+        }
+    },
+    "admin": {
+        "job_54e7c6e0": {
+            "id": "job_54e7c6e0",
+            "user": "admin",
+            "inputs": {
+                "budget": 25000,
+                "risk_score": 60,
+                "sectors": [],
+                "market_caps": [
+                    "Mid",
+                    "Large"
+                ],
+                "instructions": ""
+            },
+            "status": "\u2705 Completed",
+            "current_step": "Complete",
+            "submitted_at": "2025-04-16T21:27:18.360103",
+            "started_at": "2025-04-16T21:27:19.449327",
+            "completed_at": "2025-04-16T21:27:38.148200",
+            "progress_log": [
+                "[2025-04-16 21:27:18] Job created and queued.",
+                "[21:27:19] Job started.",
+                "[21:27:19] Starting Screening...",
+                "[21:27:21] Screening complete. Found 12 tickers.",
+                "[21:27:21] Starting Fundamental Analysis for 12 tickers...",
+                "[21:27:23] Fundamental Analysis complete. 9 stocks passed.",
+                "[21:27:23] Starting Sentiment Analysis for 9 tickers...",
+                "[21:27:26] Sentiment Analysis complete. 5 stocks passed.",
+                "[21:27:26] Starting Technical Analysis for 5 tickers...",
+                "[21:27:30] Technical Analysis complete. 5 stocks passed.",
+                "[21:27:30] Starting Strategy Development for 5 tickers...",
+                "[21:27:35] Strategy Development complete for 5 stocks.",
+                "[21:27:36] Starting Final Portfolio Selection...",
+                "[21:27:38] Final Portfolio Selection complete."
+            ],
+            "results": {
+                "Screening": {
+                    "screening_data": [
+                        {
+                            "Ticker": "GME",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 68.9
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 95.8
+                        },
+                        {
+                            "Ticker": "CVX",
+                            "Sector": "Energy",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 80.6
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "Sector": "Technology",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 82.8
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 53.2
+                        },
+                        {
+                            "Ticker": "XOM",
+                            "Sector": "Energy",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 52.3
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "Sector": "Finance",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 98.4
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 95.3
+                        },
+                        {
+                            "Ticker": "BAC",
+                            "Sector": "Finance",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 86.9
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 58.6
+                        },
+                        {
+                            "Ticker": "JNJ",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 74.4
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 89.1
+                        }
+                    ],
+                    "passing_tickers": [
+                        "GME",
+                        "MSFT",
+                        "CVX",
+                        "RBLX",
+                        "AAPL",
+                        "XOM",
+                        "BRK-B",
+                        "ETSY",
+                        "BAC",
+                        "SAVA",
+                        "JNJ",
+                        "PFE"
+                    ]
+                },
+                "Fundamental Analysis": {
+                    "fundamental_data": [
+                        {
+                            "Ticker": "GME",
+                            "P/E Ratio": 40.07,
+                            "ROE (%)": 16.69,
+                            "Debt/Equity": 1.23,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 3.49
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "P/E Ratio": 26.86,
+                            "ROE (%)": 9.86,
+                            "Debt/Equity": 1.5,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 0.12
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "P/E Ratio": 30.78,
+                            "ROE (%)": 18.8,
+                            "Debt/Equity": 1.04,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "P/E Ratio": 29.27,
+                            "ROE (%)": 8.4,
+                            "Debt/Equity": 0.2,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "XOM",
+                            "P/E Ratio": 43.99,
+                            "ROE (%)": 6.83,
+                            "Debt/Equity": 1.36,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "P/E Ratio": 48.04,
+                            "ROE (%)": 15.39,
+                            "Debt/Equity": 1.19,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "P/E Ratio": 40.2,
+                            "ROE (%)": 7.3,
+                            "Debt/Equity": 0.53,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "BAC",
+                            "P/E Ratio": 44.19,
+                            "ROE (%)": 18.16,
+                            "Debt/Equity": 0.51,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "P/E Ratio": 24.7,
+                            "ROE (%)": 10.66,
+                            "Debt/Equity": 0.29,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.47
+                        }
+                    ],
+                    "passing_tickers": [
+                        "GME",
+                        "MSFT",
+                        "RBLX",
+                        "AAPL",
+                        "XOM",
+                        "BRK-B",
+                        "ETSY",
+                        "BAC",
+                        "SAVA"
+                    ]
+                },
+                "Sentiment Analysis": {
+                    "sentiment_data": [
+                        {
+                            "Ticker": "GME",
+                            "Sentiment Score": 0.01,
+                            "Trending Keywords": "AI, New Product",
+                            "News Volume (24h)": 19,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "Sentiment Score": 0.27,
+                            "Trending Keywords": "AI, Earnings, Regulations",
+                            "News Volume (24h)": 35,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Sentiment Score": -0.39,
+                            "Trending Keywords": "New Product, Growth, Competition",
+                            "News Volume (24h)": 21,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "BAC",
+                            "Sentiment Score": -0.15,
+                            "Trending Keywords": "Earnings, New Product, Competition",
+                            "News Volume (24h)": 15,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "Sentiment Score": -0.03,
+                            "Trending Keywords": "Growth, AI, Competition",
+                            "News Volume (24h)": 40,
+                            "Social Media Buzz": "Medium"
+                        }
+                    ],
+                    "passing_tickers": [
+                        "GME",
+                        "RBLX",
+                        "AAPL",
+                        "BAC",
+                        "SAVA"
+                    ]
+                },
+                "Technical Analysis": {
+                    "technical_data": [
+                        {
+                            "Ticker": "GME",
+                            "RSI (14)": 48.4,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 3.3
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "RSI (14)": 60.7,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 3.72
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "RSI (14)": 46.2,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 1.29
+                        },
+                        {
+                            "Ticker": "BAC",
+                            "RSI (14)": 48.9,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 2.28
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "RSI (14)": 52.7,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 2.83
+                        }
+                    ],
+                    "passing_tickers": [
+                        "GME",
+                        "RBLX",
+                        "AAPL",
+                        "BAC",
+                        "SAVA"
+                    ]
+                },
+                "Strategy Development": {
+                    "strategies_per_stock": {
+                        "GME": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.4,
+                                    "Volatility (%)": 19.35,
+                                    "Sharpe Ratio": 1.22
+                                }
+                            },
+                            {
+                                "strategy_name": "Dividend Growth #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.27,
+                                    "Volatility (%)": 21.05,
+                                    "Sharpe Ratio": 1.33
+                                }
+                            }
+                        ],
+                        "RBLX": [
+                            {
+                                "strategy_name": "Momentum #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 22.04,
+                                    "Volatility (%)": 22.99,
+                                    "Sharpe Ratio": 0.74
+                                }
+                            },
+                            {
+                                "strategy_name": "Mean Reversion #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 21.06,
+                                    "Volatility (%)": 20.86,
+                                    "Sharpe Ratio": 1.21
+                                }
+                            }
+                        ],
+                        "AAPL": [
+                            {
+                                "strategy_name": "Momentum #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 24.79,
+                                    "Volatility (%)": 18.17,
+                                    "Sharpe Ratio": 0.63
+                                }
+                            }
+                        ],
+                        "BAC": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 11.4,
+                                    "Volatility (%)": 26.9,
+                                    "Sharpe Ratio": 0.8
+                                }
+                            },
+                            {
+                                "strategy_name": "Momentum #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 9.14,
+                                    "Volatility (%)": 16.2,
+                                    "Sharpe Ratio": 1.31
+                                }
+                            }
+                        ],
+                        "SAVA": [
+                            {
+                                "strategy_name": "Volatility Breakout #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 20.51,
+                                    "Volatility (%)": 26.31,
+                                    "Sharpe Ratio": 1.25
+                                }
+                            },
+                            {
+                                "strategy_name": "Volatility Breakout #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 23.25,
+                                    "Volatility (%)": 28.48,
+                                    "Sharpe Ratio": 0.64
+                                }
+                            }
+                        ]
+                    },
+                    "final_stock_list": [
+                        "GME",
+                        "RBLX",
+                        "AAPL",
+                        "BAC",
+                        "SAVA"
+                    ]
+                },
+                "Final Portfolio Selection": {
+                    "final_portfolio": [
+                        {
+                            "Ticker": "RBLX",
+                            "Chosen Strategy": "Mean Reversion #2",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 21.06,
+                            "Volatility (%)": 20.86,
+                            "Sharpe Ratio": 1.21,
+                            "Allocation (%)": 25.0
+                        },
+                        {
+                            "Ticker": "BAC",
+                            "Chosen Strategy": "Momentum #2",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 9.14,
+                            "Volatility (%)": 16.2,
+                            "Sharpe Ratio": 1.31,
+                            "Allocation (%)": 25.0
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Chosen Strategy": "Momentum #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 24.79,
+                            "Volatility (%)": 18.17,
+                            "Sharpe Ratio": 0.63,
+                            "Allocation (%)": 25.0
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "Chosen Strategy": "Volatility Breakout #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 20.51,
+                            "Volatility (%)": 26.31,
+                            "Sharpe Ratio": 1.25,
+                            "Allocation (%)": 25.0
+                        }
+                    ]
+                }
+            },
+            "error_message": null
+        },
+        "job_f16b2aa5": {
+            "id": "job_f16b2aa5",
+            "user": "admin",
+            "inputs": {
+                "budget": 25000,
+                "risk_score": 60,
+                "sectors": [],
+                "market_caps": [
+                    "Mid",
+                    "Large"
+                ],
+                "instructions": ""
+            },
+            "status": "\u2705 Completed",
+            "current_step": "Complete",
+            "submitted_at": "2025-04-16T22:08:19.729186",
+            "started_at": "2025-04-16T22:08:20.822726",
+            "completed_at": "2025-04-16T22:09:51.990390",
+            "progress_log": [
+                "[2025-04-16 22:08:19] Job created and queued.",
+                "[22:08:20] Job started.",
+                "[22:08:20] Starting Screening...",
+                "[22:08:22] Screening complete. Found 21 tickers.",
+                "[22:08:22] Starting Fundamental Analysis for 21 tickers...",
+                "[22:08:25] Fundamental Analysis complete. 19 stocks passed.",
+                "[22:08:25] Starting Sentiment Analysis for 19 tickers...",
+                "[22:08:28] Sentiment Analysis complete. 14 stocks passed.",
+                "[22:09:08] Starting Technical Analysis for 14 tickers...",
+                "[22:09:11] Technical Analysis complete. 14 stocks passed.",
+                "[22:09:11] Starting Strategy Development for 14 tickers...",
+                "[22:09:18] Strategy Development complete for 14 stocks.",
+                "[22:09:49] Starting Final Portfolio Selection...",
+                "[22:09:51] Final Portfolio Selection complete."
+            ],
+            "results": {
+                "Screening": {
+                    "screening_data": [
+                        {
+                            "Ticker": "MRNA",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 57.4
+                        },
+                        {
+                            "Ticker": "XOM",
+                            "Sector": "Energy",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 88.5
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "Sector": "Technology",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 65.4
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "Sector": "Technology",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 71.7
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 58.4
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 60.4
+                        },
+                        {
+                            "Ticker": "SAVA",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 61.5
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 77.3
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 83.8
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 77.9
+                        },
+                        {
+                            "Ticker": "JNJ",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 59.3
+                        },
+                        {
+                            "Ticker": "AMZN",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 73.1
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "Sector": "Consumer Staples",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 79.7
+                        },
+                        {
+                            "Ticker": "CVX",
+                            "Sector": "Energy",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 94.8
+                        },
+                        {
+                            "Ticker": "META",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 50.3
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "Sector": "Finance",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 52.2
+                        },
+                        {
+                            "Ticker": "TSLA",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 88.3
+                        },
+                        {
+                            "Ticker": "PLTR",
+                            "Sector": "Technology",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 72.5
+                        },
+                        {
+                            "Ticker": "AMC",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 95.7
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 99.1
+                        },
+                        {
+                            "Ticker": "PG",
+                            "Sector": "Consumer Staples",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 90.7
+                        }
+                    ],
+                    "passing_tickers": [
+                        "MRNA",
+                        "XOM",
+                        "DOCN",
+                        "RBLX",
+                        "ETSY",
+                        "MSFT",
+                        "SAVA",
+                        "LLY",
+                        "NVDA",
+                        "AAPL",
+                        "JNJ",
+                        "AMZN",
+                        "WMT",
+                        "CVX",
+                        "META",
+                        "BRK-B",
+                        "TSLA",
+                        "PLTR",
+                        "AMC",
+                        "GME",
+                        "PG"
+                    ]
+                },
+                "Fundamental Analysis": {
+                    "fundamental_data": [
+                        {
+                            "Ticker": "MRNA",
+                            "P/E Ratio": 33.0,
+                            "ROE (%)": 22.82,
+                            "Debt/Equity": 0.26,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 4.14
+                        },
+                        {
+                            "Ticker": "XOM",
+                            "P/E Ratio": 15.82,
+                            "ROE (%)": 19.44,
+                            "Debt/Equity": 0.95,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 1.35
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "P/E Ratio": 19.64,
+                            "ROE (%)": 10.02,
+                            "Debt/Equity": 0.14,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 2.76
+                        },
+                        {
+                            "Ticker": "RBLX",
+                            "P/E Ratio": 31.14,
+                            "ROE (%)": 7.21,
+                            "Debt/Equity": 0.29,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.75
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "P/E Ratio": 41.43,
+                            "ROE (%)": 18.78,
+                            "Debt/Equity": 0.3,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "P/E Ratio": 32.77,
+                            "ROE (%)": 7.19,
+                            "Debt/Equity": 0.89,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 3.84
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "P/E Ratio": 36.59,
+                            "ROE (%)": 15.65,
+                            "Debt/Equity": 1.19,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "P/E Ratio": 29.5,
+                            "ROE (%)": 15.04,
+                            "Debt/Equity": 0.66,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 3.41
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "P/E Ratio": 49.34,
+                            "ROE (%)": 8.92,
+                            "Debt/Equity": 0.18,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 4.4
+                        },
+                        {
+                            "Ticker": "JNJ",
+                            "P/E Ratio": 39.87,
+                            "ROE (%)": 21.94,
+                            "Debt/Equity": 1.0,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 0.54
+                        },
+                        {
+                            "Ticker": "AMZN",
+                            "P/E Ratio": 29.59,
+                            "ROE (%)": 22.88,
+                            "Debt/Equity": 0.22,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 4.35
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "P/E Ratio": 16.98,
+                            "ROE (%)": 16.11,
+                            "Debt/Equity": 0.87,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 3.07
+                        },
+                        {
+                            "Ticker": "CVX",
+                            "P/E Ratio": 39.77,
+                            "ROE (%)": 11.89,
+                            "Debt/Equity": 0.19,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 2.39
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "P/E Ratio": 47.94,
+                            "ROE (%)": 24.52,
+                            "Debt/Equity": 0.18,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.45
+                        },
+                        {
+                            "Ticker": "TSLA",
+                            "P/E Ratio": 13.17,
+                            "ROE (%)": 15.94,
+                            "Debt/Equity": 1.37,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 2.0
+                        },
+                        {
+                            "Ticker": "PLTR",
+                            "P/E Ratio": 17.54,
+                            "ROE (%)": 10.26,
+                            "Debt/Equity": 0.64,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 3.32
+                        },
+                        {
+                            "Ticker": "AMC",
+                            "P/E Ratio": 44.34,
+                            "ROE (%)": 10.66,
+                            "Debt/Equity": 0.37,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 0.22
+                        },
+                        {
+                            "Ticker": "GME",
+                            "P/E Ratio": 31.83,
+                            "ROE (%)": 21.82,
+                            "Debt/Equity": 0.11,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 0.0
+                        },
+                        {
+                            "Ticker": "PG",
+                            "P/E Ratio": 35.91,
+                            "ROE (%)": 22.49,
+                            "Debt/Equity": 0.66,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 2.11
+                        }
+                    ],
+                    "passing_tickers": [
+                        "MRNA",
+                        "XOM",
+                        "DOCN",
+                        "RBLX",
+                        "ETSY",
+                        "MSFT",
+                        "LLY",
+                        "NVDA",
+                        "AAPL",
+                        "JNJ",
+                        "AMZN",
+                        "WMT",
+                        "CVX",
+                        "BRK-B",
+                        "TSLA",
+                        "PLTR",
+                        "AMC",
+                        "GME",
+                        "PG"
+                    ]
+                },
+                "Sentiment Analysis": {
+                    "sentiment_data": [
+                        {
+                            "Ticker": "MRNA",
+                            "Sentiment Score": -0.32,
+                            "Trending Keywords": "Earnings",
+                            "News Volume (24h)": 15,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "Sentiment Score": 0.03,
+                            "Trending Keywords": "Regulations",
+                            "News Volume (24h)": 48,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "Sentiment Score": -0.45,
+                            "Trending Keywords": "New Product",
+                            "News Volume (24h)": 26,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "Sentiment Score": 0.35,
+                            "Trending Keywords": "New Product, AI",
+                            "News Volume (24h)": 6,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "Sentiment Score": 0.73,
+                            "Trending Keywords": "Earnings, Growth, AI",
+                            "News Volume (24h)": 24,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "Sentiment Score": 0.66,
+                            "Trending Keywords": "Competition, Regulations, New Product",
+                            "News Volume (24h)": 6,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "JNJ",
+                            "Sentiment Score": 0.73,
+                            "Trending Keywords": "Regulations",
+                            "News Volume (24h)": 50,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "AMZN",
+                            "Sentiment Score": -0.39,
+                            "Trending Keywords": "New Product, Earnings, Regulations",
+                            "News Volume (24h)": 29,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "Sentiment Score": 0.49,
+                            "Trending Keywords": "New Product, Competition, Growth",
+                            "News Volume (24h)": 27,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "CVX",
+                            "Sentiment Score": 0.2,
+                            "Trending Keywords": "Growth, Earnings",
+                            "News Volume (24h)": 27,
+                            "Social Media Buzz": "Medium"
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "Sentiment Score": 0.12,
+                            "Trending Keywords": "Competition, Regulations, Earnings",
+                            "News Volume (24h)": 25,
+                            "Social Media Buzz": "Medium"
+                        },
+                        {
+                            "Ticker": "TSLA",
+                            "Sentiment Score": -0.08,
+                            "Trending Keywords": "New Product, Regulations, AI",
+                            "News Volume (24h)": 15,
+                            "Social Media Buzz": "Medium"
+                        },
+                        {
+                            "Ticker": "AMC",
+                            "Sentiment Score": 0.2,
+                            "Trending Keywords": "Growth, New Product",
+                            "News Volume (24h)": 20,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "PG",
+                            "Sentiment Score": 0.27,
+                            "Trending Keywords": "AI, New Product, Competition",
+                            "News Volume (24h)": 12,
+                            "Social Media Buzz": "Medium"
+                        }
+                    ],
+                    "passing_tickers": [
+                        "MRNA",
+                        "DOCN",
+                        "ETSY",
+                        "MSFT",
+                        "LLY",
+                        "NVDA",
+                        "JNJ",
+                        "AMZN",
+                        "WMT",
+                        "CVX",
+                        "BRK-B",
+                        "TSLA",
+                        "AMC",
+                        "PG"
+                    ]
+                },
+                "Technical Analysis": {
+                    "technical_data": [
+                        {
+                            "Ticker": "MRNA",
+                            "RSI (14)": 49.4,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 1.96
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "RSI (14)": 68.5,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 4.43
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "RSI (14)": 30.1,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 2.55
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "RSI (14)": 55.5,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 2.43
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "RSI (14)": 56.0,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 2.87
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "RSI (14)": 56.4,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 3.48
+                        },
+                        {
+                            "Ticker": "JNJ",
+                            "RSI (14)": 56.0,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 1.25
+                        },
+                        {
+                            "Ticker": "AMZN",
+                            "RSI (14)": 58.4,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 2.63
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "RSI (14)": 64.3,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 4.69
+                        },
+                        {
+                            "Ticker": "CVX",
+                            "RSI (14)": 58.1,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 2.69
+                        },
+                        {
+                            "Ticker": "BRK-B",
+                            "RSI (14)": 57.1,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 1.11
+                        },
+                        {
+                            "Ticker": "TSLA",
+                            "RSI (14)": 50.2,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 3.63
+                        },
+                        {
+                            "Ticker": "AMC",
+                            "RSI (14)": 49.5,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 4.56
+                        },
+                        {
+                            "Ticker": "PG",
+                            "RSI (14)": 36.4,
+                            "MACD Signal": "Bearish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 4.33
+                        }
+                    ],
+                    "passing_tickers": [
+                        "MRNA",
+                        "DOCN",
+                        "ETSY",
+                        "MSFT",
+                        "LLY",
+                        "NVDA",
+                        "JNJ",
+                        "AMZN",
+                        "WMT",
+                        "CVX",
+                        "BRK-B",
+                        "TSLA",
+                        "AMC",
+                        "PG"
+                    ]
+                },
+                "Strategy Development": {
+                    "strategies_per_stock": {
+                        "MRNA": [
+                            {
+                                "strategy_name": "MA Crossover #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 20.43,
+                                    "Volatility (%)": 10.59,
+                                    "Sharpe Ratio": 0.58
+                                }
+                            },
+                            {
+                                "strategy_name": "Volatility Breakout #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.9,
+                                    "Volatility (%)": 21.23,
+                                    "Sharpe Ratio": 1.4
+                                }
+                            }
+                        ],
+                        "DOCN": [
+                            {
+                                "strategy_name": "Mean Reversion #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 8.56,
+                                    "Volatility (%)": 25.49,
+                                    "Sharpe Ratio": 1.26
+                                }
+                            }
+                        ],
+                        "ETSY": [
+                            {
+                                "strategy_name": "Volatility Breakout #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 18.45,
+                                    "Volatility (%)": 17.99,
+                                    "Sharpe Ratio": 0.59
+                                }
+                            },
+                            {
+                                "strategy_name": "Mean Reversion #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 13.65,
+                                    "Volatility (%)": 27.61,
+                                    "Sharpe Ratio": 1.45
+                                }
+                            }
+                        ],
+                        "MSFT": [
+                            {
+                                "strategy_name": "Momentum #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 9.46,
+                                    "Volatility (%)": 26.54,
+                                    "Sharpe Ratio": 0.61
+                                }
+                            }
+                        ],
+                        "LLY": [
+                            {
+                                "strategy_name": "Dividend Growth #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 6.12,
+                                    "Volatility (%)": 26.07,
+                                    "Sharpe Ratio": 1.14
+                                }
+                            }
+                        ],
+                        "NVDA": [
+                            {
+                                "strategy_name": "Volatility Breakout #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 5.11,
+                                    "Volatility (%)": 27.76,
+                                    "Sharpe Ratio": 0.61
+                                }
+                            }
+                        ],
+                        "JNJ": [
+                            {
+                                "strategy_name": "Momentum #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 12.29,
+                                    "Volatility (%)": 24.32,
+                                    "Sharpe Ratio": 0.9
+                                }
+                            },
+                            {
+                                "strategy_name": "MA Crossover #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.3,
+                                    "Volatility (%)": 21.28,
+                                    "Sharpe Ratio": 0.57
+                                }
+                            }
+                        ],
+                        "AMZN": [
+                            {
+                                "strategy_name": "Mean Reversion #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 23.06,
+                                    "Volatility (%)": 17.86,
+                                    "Sharpe Ratio": 1.35
+                                }
+                            },
+                            {
+                                "strategy_name": "Dividend Growth #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 14.44,
+                                    "Volatility (%)": 18.33,
+                                    "Sharpe Ratio": 1.26
+                                }
+                            }
+                        ],
+                        "WMT": [
+                            {
+                                "strategy_name": "Mean Reversion #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 16.73,
+                                    "Volatility (%)": 18.96,
+                                    "Sharpe Ratio": 1.11
+                                }
+                            },
+                            {
+                                "strategy_name": "Value Dip Buy #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 7.67,
+                                    "Volatility (%)": 27.37,
+                                    "Sharpe Ratio": 0.61
+                                }
+                            }
+                        ],
+                        "CVX": [
+                            {
+                                "strategy_name": "MA Crossover #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 15.31,
+                                    "Volatility (%)": 27.11,
+                                    "Sharpe Ratio": 0.76
+                                }
+                            }
+                        ],
+                        "BRK-B": [
+                            {
+                                "strategy_name": "Volatility Breakout #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 13.84,
+                                    "Volatility (%)": 12.66,
+                                    "Sharpe Ratio": 0.57
+                                }
+                            }
+                        ],
+                        "TSLA": [
+                            {
+                                "strategy_name": "Mean Reversion #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 24.55,
+                                    "Volatility (%)": 23.22,
+                                    "Sharpe Ratio": 1.35
+                                }
+                            }
+                        ],
+                        "AMC": [
+                            {
+                                "strategy_name": "Momentum #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 15.1,
+                                    "Volatility (%)": 22.1,
+                                    "Sharpe Ratio": 1.12
+                                }
+                            },
+                            {
+                                "strategy_name": "Dividend Growth #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 20.88,
+                                    "Volatility (%)": 23.76,
+                                    "Sharpe Ratio": 0.94
+                                }
+                            }
+                        ],
+                        "PG": [
+                            {
+                                "strategy_name": "Dividend Growth #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 18.91,
+                                    "Volatility (%)": 11.25,
+                                    "Sharpe Ratio": 1.25
+                                }
+                            }
+                        ]
+                    },
+                    "final_stock_list": [
+                        "MRNA",
+                        "DOCN",
+                        "ETSY",
+                        "MSFT",
+                        "LLY",
+                        "NVDA",
+                        "JNJ",
+                        "AMZN",
+                        "WMT",
+                        "CVX",
+                        "BRK-B",
+                        "TSLA",
+                        "AMC",
+                        "PG"
+                    ]
+                },
+                "Final Portfolio Selection": {
+                    "final_portfolio": [
+                        {
+                            "Ticker": "LLY",
+                            "Chosen Strategy": "Dividend Growth #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 6.12,
+                            "Volatility (%)": 26.07,
+                            "Sharpe Ratio": 1.14,
+                            "Allocation (%)": 25.0
+                        },
+                        {
+                            "Ticker": "PG",
+                            "Chosen Strategy": "Dividend Growth #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 18.91,
+                            "Volatility (%)": 11.25,
+                            "Sharpe Ratio": 1.25,
+                            "Allocation (%)": 25.0
+                        },
+                        {
+                            "Ticker": "JNJ",
+                            "Chosen Strategy": "Momentum #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 12.29,
+                            "Volatility (%)": 24.32,
+                            "Sharpe Ratio": 0.9,
+                            "Allocation (%)": 25.0
+                        },
+                        {
+                            "Ticker": "AMC",
+                            "Chosen Strategy": "Momentum #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 15.1,
+                            "Volatility (%)": 22.1,
+                            "Sharpe Ratio": 1.12,
+                            "Allocation (%)": 25.0
+                        }
+                    ]
+                }
+            },
+            "error_message": null
+        }
+    },
+    "harsh": {
+        "job_0e82a4d4": {
+            "id": "job_0e82a4d4",
+            "user": "harsh",
+            "inputs": {
+                "budget": 25000,
+                "risk_score": 60,
+                "sectors": [],
+                "market_caps": [
+                    "Mid",
+                    "Large"
+                ],
+                "instructions": ""
+            },
+            "status": "\u2705 Completed",
+            "current_step": "Complete",
+            "submitted_at": "2025-04-16T23:08:19.982452",
+            "started_at": "2025-04-16T23:08:21.084860",
+            "completed_at": "2025-04-16T23:08:48.528035",
+            "progress_log": [
+                "[2025-04-16 23:08:19] Job created and queued.",
+                "[23:08:21] Job started.",
+                "[23:08:21] Starting Screening...",
+                "[23:08:22] Screening complete. Found 12 tickers.",
+                "[23:08:22] Starting Fundamental Analysis for 12 tickers...",
+                "[23:08:25] Fundamental Analysis complete. 7 stocks passed.",
+                "[23:08:25] Starting Sentiment Analysis for 7 tickers...",
+                "[23:08:28] Sentiment Analysis complete. 7 stocks passed.",
+                "[23:08:28] Starting Technical Analysis for 7 tickers...",
+                "[23:08:32] Technical Analysis complete. 5 stocks passed.",
+                "[23:08:32] Starting Strategy Development for 5 tickers...",
+                "[23:08:40] Starting Strategy Development for 5 tickers...",
+                "[23:08:40] Starting Strategy Development for 5 tickers...",
+                "[23:08:40] Strategy Development complete for 5 stocks.",
+                "[23:08:45] Strategy Development complete for 5 stocks.",
+                "[23:08:46] Starting Final Portfolio Selection...",
+                "[23:08:47] Strategy Development complete for 5 stocks.",
+                "[23:08:48] Final Portfolio Selection complete."
+            ],
+            "results": {
+                "Screening": {
+                    "screening_data": [
+                        {
+                            "Ticker": "TSLA",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 64.3
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "Sector": "Technology",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 95.3
+                        },
+                        {
+                            "Ticker": "WMT",
+                            "Sector": "Consumer Staples",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 98.1
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 76.0
+                        },
+                        {
+                            "Ticker": "AMC",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Small-Cap",
+                            "Liquidity Score": 91.0
+                        },
+                        {
+                            "Ticker": "UNH",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 62.2
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 77.0
+                        },
+                        {
+                            "Ticker": "ETSY",
+                            "Sector": "Consumer Discretionary",
+                            "Market Cap": "Mid-Cap",
+                            "Liquidity Score": 87.3
+                        },
+                        {
+                            "Ticker": "AAPL",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 67.4
+                        },
+                        {
+                            "Ticker": "MSFT",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 91.9
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "Sector": "Healthcare",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 84.3
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "Sector": "Technology",
+                            "Market Cap": "Large-Cap",
+                            "Liquidity Score": 63.6
+                        }
+                    ],
+                    "passing_tickers": [
+                        "TSLA",
+                        "DOCN",
+                        "WMT",
+                        "GME",
+                        "AMC",
+                        "UNH",
+                        "LLY",
+                        "ETSY",
+                        "AAPL",
+                        "MSFT",
+                        "PFE",
+                        "NVDA"
+                    ]
+                },
+                "Fundamental Analysis": {
+                    "fundamental_data": [
+                        {
+                            "Ticker": "TSLA",
+                            "P/E Ratio": 28.63,
+                            "ROE (%)": 8.92,
+                            "Debt/Equity": 0.69,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 2.5
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "P/E Ratio": 43.85,
+                            "ROE (%)": 21.79,
+                            "Debt/Equity": 0.86,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 3.01
+                        },
+                        {
+                            "Ticker": "GME",
+                            "P/E Ratio": 35.73,
+                            "ROE (%)": 12.96,
+                            "Debt/Equity": 0.76,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 1.08
+                        },
+                        {
+                            "Ticker": "UNH",
+                            "P/E Ratio": 38.02,
+                            "ROE (%)": 24.3,
+                            "Debt/Equity": 1.38,
+                            "Analyst Rating": "Strong Buy",
+                            "Dividend Yield (%)": 3.79
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "P/E Ratio": 12.13,
+                            "ROE (%)": 19.81,
+                            "Debt/Equity": 0.16,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 1.69
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "P/E Ratio": 38.64,
+                            "ROE (%)": 22.79,
+                            "Debt/Equity": 0.72,
+                            "Analyst Rating": "Hold",
+                            "Dividend Yield (%)": 2.11
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "P/E Ratio": 23.68,
+                            "ROE (%)": 11.35,
+                            "Debt/Equity": 0.42,
+                            "Analyst Rating": "Buy",
+                            "Dividend Yield (%)": 0.91
+                        }
+                    ],
+                    "passing_tickers": [
+                        "TSLA",
+                        "DOCN",
+                        "GME",
+                        "UNH",
+                        "LLY",
+                        "PFE",
+                        "NVDA"
+                    ]
+                },
+                "Sentiment Analysis": {
+                    "sentiment_data": [
+                        {
+                            "Ticker": "TSLA",
+                            "Sentiment Score": 0.54,
+                            "Trending Keywords": "Competition, New Product, AI",
+                            "News Volume (24h)": 33,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "Sentiment Score": 0.2,
+                            "Trending Keywords": "Competition, Growth, Earnings",
+                            "News Volume (24h)": 46,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Sentiment Score": -0.09,
+                            "Trending Keywords": "Competition, New Product, Earnings",
+                            "News Volume (24h)": 36,
+                            "Social Media Buzz": "High"
+                        },
+                        {
+                            "Ticker": "UNH",
+                            "Sentiment Score": -0.37,
+                            "Trending Keywords": "New Product, Earnings, Growth",
+                            "News Volume (24h)": 22,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "LLY",
+                            "Sentiment Score": -0.48,
+                            "Trending Keywords": "AI",
+                            "News Volume (24h)": 36,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "PFE",
+                            "Sentiment Score": 0.68,
+                            "Trending Keywords": "AI, New Product",
+                            "News Volume (24h)": 49,
+                            "Social Media Buzz": "Low"
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "Sentiment Score": 0.04,
+                            "Trending Keywords": "AI, Earnings",
+                            "News Volume (24h)": 30,
+                            "Social Media Buzz": "Medium"
+                        }
+                    ],
+                    "passing_tickers": [
+                        "TSLA",
+                        "DOCN",
+                        "GME",
+                        "UNH",
+                        "LLY",
+                        "PFE",
+                        "NVDA"
+                    ]
+                },
+                "Technical Analysis": {
+                    "technical_data": [
+                        {
+                            "Ticker": "TSLA",
+                            "RSI (14)": 58.6,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 2.27
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "RSI (14)": 61.6,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 2.3
+                        },
+                        {
+                            "Ticker": "GME",
+                            "RSI (14)": 49.1,
+                            "MACD Signal": "Neutral",
+                            "Price vs MA(50)": "Above",
+                            "Trend (Short Term)": "Downtrend",
+                            "Volatility (ATR)": 4.62
+                        },
+                        {
+                            "Ticker": "UNH",
+                            "RSI (14)": 43.9,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Touching",
+                            "Trend (Short Term)": "Uptrend",
+                            "Volatility (ATR)": 3.6
+                        },
+                        {
+                            "Ticker": "NVDA",
+                            "RSI (14)": 60.7,
+                            "MACD Signal": "Bullish Crossover",
+                            "Price vs MA(50)": "Below",
+                            "Trend (Short Term)": "Sideways",
+                            "Volatility (ATR)": 0.94
+                        }
+                    ],
+                    "passing_tickers": [
+                        "TSLA",
+                        "DOCN",
+                        "GME",
+                        "UNH",
+                        "NVDA"
+                    ]
+                },
+                "Strategy Development": {
+                    "strategies_per_stock": {
+                        "TSLA": [
+                            {
+                                "strategy_name": "Dividend Growth #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 12.2,
+                                    "Volatility (%)": 17.69,
+                                    "Sharpe Ratio": 1.32
+                                }
+                            },
+                            {
+                                "strategy_name": "Value Dip Buy #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 15.62,
+                                    "Volatility (%)": 17.45,
+                                    "Sharpe Ratio": 0.84
+                                }
+                            }
+                        ],
+                        "DOCN": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 18.53,
+                                    "Volatility (%)": 29.88,
+                                    "Sharpe Ratio": 1.37
+                                }
+                            }
+                        ],
+                        "GME": [
+                            {
+                                "strategy_name": "Volatility Breakout #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 10.64,
+                                    "Volatility (%)": 25.17,
+                                    "Sharpe Ratio": 0.99
+                                }
+                            },
+                            {
+                                "strategy_name": "Volatility Breakout #2",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 21.88,
+                                    "Volatility (%)": 19.23,
+                                    "Sharpe Ratio": 1.01
+                                }
+                            }
+                        ],
+                        "UNH": [
+                            {
+                                "strategy_name": "Value Dip Buy #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 9.21,
+                                    "Volatility (%)": 26.47,
+                                    "Sharpe Ratio": 1.29
+                                }
+                            }
+                        ],
+                        "NVDA": [
+                            {
+                                "strategy_name": "Dividend Growth #1",
+                                "description": "...",
+                                "metrics": {
+                                    "Annualized Return (%)": 22.33,
+                                    "Volatility (%)": 16.97,
+                                    "Sharpe Ratio": 0.68
+                                }
+                            }
+                        ]
+                    },
+                    "final_stock_list": [
+                        "TSLA",
+                        "DOCN",
+                        "GME",
+                        "UNH",
+                        "NVDA"
+                    ]
+                },
+                "Final Portfolio Selection": {
+                    "final_portfolio": [
+                        {
+                            "Ticker": "NVDA",
+                            "Chosen Strategy": "Mean Reversion #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 9.23,
+                            "Volatility (%)": 24.9,
+                            "Sharpe Ratio": 1.25,
+                            "Allocation (%)": 20.0
+                        },
+                        {
+                            "Ticker": "DOCN",
+                            "Chosen Strategy": "Value Dip Buy #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 8.12,
+                            "Volatility (%)": 14.35,
+                            "Sharpe Ratio": 1.47,
+                            "Allocation (%)": 20.0
+                        },
+                        {
+                            "Ticker": "UNH",
+                            "Chosen Strategy": "Value Dip Buy #2",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 19.44,
+                            "Volatility (%)": 19.36,
+                            "Sharpe Ratio": 0.9,
+                            "Allocation (%)": 20.0
+                        },
+                        {
+                            "Ticker": "GME",
+                            "Chosen Strategy": "Mean Reversion #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 16.19,
+                            "Volatility (%)": 27.5,
+                            "Sharpe Ratio": 1.39,
+                            "Allocation (%)": 20.0
+                        },
+                        {
+                            "Ticker": "TSLA",
+                            "Chosen Strategy": "Dividend Growth #1",
+                            "Strategy Description": "...",
+                            "Annualized Return (%)": 13.0,
+                            "Volatility (%)": 19.1,
+                            "Sharpe Ratio": 1.1,
+                            "Allocation (%)": 20.0
+                        }
+                    ]
+                }
+            },
+            "error_message": null
+        }
+    }
+}
