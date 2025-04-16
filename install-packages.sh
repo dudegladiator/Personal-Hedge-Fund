@@ -11,5 +11,3 @@ else
     echo "Unsupported operating system or manual installation required for Windows. Please follow README instructions."
     exit 1
 fi
-
-uv add -r requirements.txt

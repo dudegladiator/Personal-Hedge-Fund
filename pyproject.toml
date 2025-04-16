@@ -1,0 +1,28 @@
+[project]
+name = "hedge-fund-manager"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "bcrypt==4.3.0",
+    "langchain==0.3.20",
+    "langgraph==0.3.5",
+    "langsmith==0.3.11",
+    "motor==3.7.0",
+    "nsepythonserver==2.93",
+    "numpy==2.2.4",
+    "openai==1.66.3",
+    "pandas==2.2.3",
+    "pydantic==2.10.3",
+    "pydantic-core==2.27.1",
+    "pydantic-settings==2.7.0",
+    "pymongo==4.11.2",
+    "python-dotenv==1.0.0",
+    "pytz==2025.1",
+    "requests-ratelimiter==0.7.0",
+    "rich==13.9.4",
+    "streamlit==1.44.0",
+    "streamlit-cookies-manager==0.2.0",
+    "yfinance==0.2.54",
+]
