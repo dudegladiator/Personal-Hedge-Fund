@@ -18,8 +18,7 @@ nsepythonserver==2.93
 requests-ratelimiter==0.7.0
 pandas==2.2.3
 numpy==2.2.4
-ta-lib-bin==0.4.26
-# ta-lib==0.6.3
+ta-lib==0.6.3
 
 streamlit==1.44.0
 streamlit-cookies-manager==0.2.0
