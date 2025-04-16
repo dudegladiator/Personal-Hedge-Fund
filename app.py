@@ -2,7 +2,6 @@ import streamlit as st
 
 # --- Page Setup (Should be first Streamlit command) ---
 st.set_page_config(layout='wide', page_title="AI Hedge Fund", page_icon=":moneybag:")
-import install_talib
 
 # --- Core Imports ---
 import time
