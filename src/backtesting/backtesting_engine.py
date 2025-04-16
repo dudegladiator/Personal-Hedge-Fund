@@ -440,15 +440,15 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         if not isinstance(signals, pd.DataFrame):
             # This error means the strategy code itself is fundamentally broken
             # or didn't return a DataFrame as required.
-            raise TypeError(f"Strategy '{strategy.__name__}' did not return a pandas DataFrame.") # Assuming strategy has a __name__
+            raise TypeError(f"Code '{params.strategy_code}' did not return a pandas DataFrame.") # Assuming strategy has a __name__
 
         # Check if the mandatory 'Signal' column exists
         if 'Signal' not in signals.columns:
-            raise ValueError(f"Strategy '{strategy.__name__}' must return DataFrame with 'Signal' column")
+            raise ValueError(f"Code '{params.strategy_code}' must return DataFrame with 'Signal' column")
 
         # Check if the mandatory 'Error' column exists (as per the latest prompt)
         if 'Error' not in signals.columns:
-            raise ValueError(f"Strategy '{strategy.__name__}' must return DataFrame with 'Error' column")
+            raise ValueError(f"Code '{params.strategy_code}' must return DataFrame with 'Error' column")
 
         # --- Validation 2: Check for Reported Errors from Strategy ---
 
@@ -461,7 +461,7 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
             # Extract the first reported error message for logging/reporting.
             first_error_message = signals['Error'].dropna().iloc[0]
             # Raise a specific error indicating the strategy logic failed.
-            raise RuntimeError(f"Strategy '{strategy.__name__}' reported an internal execution error: {first_error_message}")
+            raise RuntimeError(f"Code '{params.strategy_code}' reported an internal execution error: {first_error_message}")
         
         # Run simulation
         trades, equity_curve = simulate_trades(data, signals, params)

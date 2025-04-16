@@ -103,7 +103,7 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         logger.error(f"Error in announcement analysis for {symbol}: {str(e)}", exc_info=True)
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
-def get_recommendation_from_news(symbol, exchange="nse", past_days=10, force = False):
+def get_recommendation_from_news(symbol, exchange="nse", past_days=14, force = False):
     logger.info(f"Getting news recommendations for {symbol} on {exchange} for past {past_days} days")
     try:
         data = get_stock_news(symbol, exchange, refresh_days=1, force=force)
@@ -204,7 +204,7 @@ if __name__ == "__main__":
         # "AXISBANK",
         # "HEROMOTOCO",
         # "HAL",
-        # "MCDOWELL-N",
+        # "UNITDSPR",
         # "TATAMOTORS",
         # "NTPC",
         # "BAJAJFINSV",

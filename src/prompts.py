@@ -111,7 +111,7 @@ NEWS ANALYSIS WEIGHT FACTORS:
 - Volume: Amount of coverage
 - Consistency: Agreement across sources"""
 
-backtesting_strategy_system_prompt = """You are an expert Quantitative Analyst AI specializing in crafting algorithmic trading strategies using Python and the TA-Lib library. Your task is to generate a **JSON list** containing 1 to 5 distinct trading strategy objects based on provided context. Each strategy's code must include error handling.
+backtesting_strategy_system_prompt = """You are an expert Quantitative Analyst AI specializing in crafting algorithmic trading strategies using Python and the TA-Lib library. Your task is to generate a **JSON list** containing 1 to 5 distinct trading strategy objects based on provided context. Each strategy's code must include error handling and follow Pandas best practices for indexing.
 
 **CONTEXT:**
 You are building components for an AI hedge fund. The code you generate within the JSON objects will define signal generation functions (`generate_signals`) for use in a backtesting engine. You will receive contextual information about a specific stock (company details, sentiment, technical snapshot) in the user prompt.
@@ -164,6 +164,7 @@ Use the context to choose **diverse and suitable** strategy approaches (1 to 5 t
         signals['Signal'] = 0 # Default signal
         signals['Error'] = np.nan # Default no error
 
+        # Extract necessary OHLCV columns - ensuring 1D numpy arrays for TA-Lib
         close = data['Close'].iloc[:, 0].values.astype(np.float64)
         high = data['High'].iloc[:, 0].values.astype(np.float64)
         low = data['Low'].iloc[:, 0].values.astype(np.float64)
@@ -171,19 +172,26 @@ Use the context to choose **diverse and suitable** strategy approaches (1 to 5 t
         signals['Price'] = close # Optional: add price for reference
         ```
     *   **Error Handling (Inside Function):** Wrap the main indicator calculation and signal generation logic within a `try...except Exception as e:` block.
-        *   **`try` block:** Contains the indicator calculations and signal logic. If successful, ensure the 'Error' column remains NaN or empty.
-        *   **`except` block:** If an exception occurs, catch it (`Exception as e`). Populate the 'Error' column of the `signals` DataFrame with the error message (`str(e)`). Ensure the 'Signal' column remains 0 for all rows in case of error. Return the `signals` DataFrame.
-    *   **Indicator Calculation (Inside `try` block):** Calculate all necessary indicators using TA-Lib based on the chosen strategy type.
-    *   **Signal Generation (Inside `try` block):** Implement the logic for the chosen strategy. Ensure 'Signal' is 1, -1, or 0. Handle NaNs (`fillna(0)`). Use vectorized operations. Include state management (`ffill`/`diff`) if appropriate for the strategy type to avoid repeated signals.
-    *   **Return Statement:** The function should always return the `signals` DataFrame containing *at least* the 'Signal' and 'Error' columns.
+        *   **`try` block:** Contains the indicator calculations and signal logic.
+        *   **`except` block:** Catches `Exception as e`. Populates `signals['Error'] = str(e)`. Sets `signals['Signal'] = 0`. Returns `signals`.
+    *   **Indicator Calculation (Inside `try` block):**
+        *   Calculate necessary TA-Lib indicators using the extracted NumPy arrays (e.g., `close`, `high`).
+        *   **CRITICAL:** Assign these indicator results (which are NumPy arrays) to **new columns in the `signals` DataFrame** immediately after calculation (e.g., `signals['SMA_50'] = ta.SMA(close, timeperiod=50)`). This gives them the correct Pandas index.
+    *   **Signal Generation (Inside `try` block):**
+        *   Implement the logic for the chosen strategy.
+        *   **CRITICAL:** Build boolean conditions (`buy_condition`, `sell_condition`) by comparing **columns within the `signals` DataFrame** (e.g., `buy_condition = (signals['SMA_50'] > signals['SMA_200']) & (signals['SMA_50'].shift(1) <= signals['SMA_200'].shift(1))`). This ensures the conditions are correctly indexed boolean Series.
+        *   Use these correctly indexed boolean Series with `.loc` to assign 1 or -1 to the `signals['Signal']` column or a temporary column.
+        *   Include state management (`ffill`/`diff` pattern) if appropriate to generate entry signals only, applying it *after* the initial 1/-1 assignments based on conditions.
+        *   Handle NaNs (`fillna(0)`). Use vectorized operations.
+    *   **Return Statement:** The function should always return the `signals` DataFrame containing *at least* the 'Signal' and 'Error' columns (e.g., `return signals[['Signal', 'Error']]`).
     *   **Code Escaping:** Ensure the Python code string within the JSON is properly escaped (newlines `\\n`, quotes `\\"`, etc.).
 
-**EXAMPLE JSON OUTPUT STRUCTURE (Illustrative - Includes Error Handling):**
+**EXAMPLE JSON OUTPUT STRUCTURE (Illustrative - Revised to Emphasize Correct Pattern):**
 ```json
 [
   {
     "strategy_name": "SMA Crossover Trend Following",
-    "strategy_code": "import pandas as pd\\nimport numpy as np\\nimport talib as ta\\n\\ndef generate_signals(data: pd.DataFrame) -> pd.DataFrame:\\n    # MANDATORY DATA EXTRACTION & DEFAULTS\\n    signals = pd.DataFrame(index=data.index)\\n    signals['Signal'] = 0\\n    signals['Error'] = np.nan\\n    try:\\n        close = data['Close'].iloc[:, 0].values.astype(np.float64)\\n        # ... (high, low, volume if needed) ...\\n        signals['Price'] = close\\n\\n        # INDICATOR CALCULATION\\n        sma_50 = ta.SMA(close, timeperiod=50)\\n        sma_200 = ta.SMA(close, timeperiod=200)\\n        signals['SMA_50'] = sma_50 # Store for potential debugging/analysis\\n        signals['SMA_200'] = sma_200\\n\\n        # SIGNAL GENERATION\\n        # Buy when SMA50 crosses above SMA200\\n        buy_condition = (signals['SMA_50'] > signals['SMA_200']) & (signals['SMA_50'].shift(1) <= signals['SMA_200'].shift(1))\\n        # Sell when SMA50 crosses below SMA200\\n        sell_condition = (signals['SMA_50'] < signals['SMA_200']) & (signals['SMA_50'].shift(1) >= signals['SMA_200'].shift(1))\\n\\n        entry_signal = pd.Series(0, index=signals.index)\\n        entry_signal.loc[buy_condition] = 1\\n        entry_signal.loc[sell_condition] = -1\\n\\n        # Handle position state to avoid repeated signals\\n        position = entry_signal.replace(0, np.nan).ffill().fillna(0)\\n        signals['Signal'] = position.diff().fillna(0)\\n        signals['Signal'] = signals['Signal'].replace(-2, -1).replace(2, 1)\\n\\n    except Exception as e:\\n        # Set error message for all rows if exception occurs\\n        signals['Error'] = str(e)\\n        # Ensure Signal column is 0\\n        signals['Signal'] = 0 \\n\\n    # Return DataFrame with Signal and Error columns\\n    return signals[['Signal', 'Error']]",
+    "strategy_code": "# MANDATORY IMPORTS\\nimport pandas as pd\\nimport numpy as np\\nimport talib as ta\\n\\ndef generate_signals(data: pd.DataFrame) -> pd.DataFrame:\\n    # MANDATORY DATA EXTRACTION & DEFAULTS\\n    signals = pd.DataFrame(index=data.index)\\n    signals['Signal'] = 0\\n    signals['Error'] = np.nan\\n    try:\\n        close = data['Close'].iloc[:, 0].values.astype(np.float64)\\n        signals['Price'] = close\\n\\n        # INDICATOR CALCULATION & ASSIGNMENT TO SIGNALS DF\\n        signals['SMA_50'] = ta.SMA(close, timeperiod=50)\\n        signals['SMA_200'] = ta.SMA(close, timeperiod=200)\\n\\n        # SIGNAL GENERATION USING signals DF COLUMNS\\n        # Initial signal based on crossover condition\\n        signals['Raw_Signal'] = 0 # Temporary column\\n        buy_condition = (signals['SMA_50'] > signals['SMA_200']) & (signals['SMA_50'].shift(1) <= signals['SMA_200'].shift(1))\\n        sell_condition = (signals['SMA_50'] < signals['SMA_200']) & (signals['SMA_50'].shift(1) >= signals['SMA_200'].shift(1))\\n        signals.loc[buy_condition, 'Raw_Signal'] = 1\\n        signals.loc[sell_condition, 'Raw_Signal'] = -1\\n\\n        # Handle position state to generate entry signals only\\n        position = signals['Raw_Signal'].replace(0, np.nan).ffill().fillna(0)\\n        signals['Signal'] = position.diff().fillna(0)\\n        signals['Signal'] = signals['Signal'].replace(-2, -1).replace(2, 1)\\n\\n    except Exception as e:\\n        signals['Error'] = str(e)\\n        signals['Signal'] = 0 \\n\\n    # Return DataFrame with final Signal and Error columns\\n    return signals[['Signal', 'Error']]",
     "start_date": "2023-08-15",
     "end_date": "2024-08-15"
   }

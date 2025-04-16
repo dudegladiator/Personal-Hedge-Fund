@@ -63,8 +63,9 @@ def generate_strategy_code(symbol: str, exchange: str, force: bool = False):
         company_dashboard = get_company_dashboard(symbol, exchange, force=force, refresh_days=7)
         
         company_announcement = get_recommendation_from_announcements(symbol, exchange, force=force)
-        
         company_news = get_recommendation_from_news(symbol, exchange, force=force)
+        del company_announcement["raw_data"]
+        del company_news["raw_data"]
         
         company_basic_technical_indicators = get_basic_technical_indicators(
             symbol=symbol,
@@ -152,6 +153,7 @@ def backtesting_agent(
             return {
                 "error": True,
                 "details": "No strategies were successfully backtested.",
+                "raw_data": strategy_response
             }
         analyse = analyze_backtest_results(symbol, all_results)
         logger.info(f"Backtesting completed for {symbol}")
@@ -167,14 +169,14 @@ def backtesting_agent(
 
 if __name__ == "__main__":
     stock_codes = [
-        "INDUSINDBK",
+        # "INDUSINDBK",
         # "PATANJALI",
         # "ITC",
         # "AMBUJACEM",
         # "AXISBANK",
         # "HEROMOTOCO",
         # "HAL",
-        # "MCDOWELL-N",
+        "UNITDSPR",
         # "TATAMOTORS",
         # "NTPC",
         # "BAJAJFINSV",

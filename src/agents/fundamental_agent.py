@@ -673,7 +673,7 @@ if __name__ == "__main__":
         # "AXISBANK",
         # "HEROMOTOCO",
         # "HAL",
-        # "MCDOWELL-N",
+        # "UNITDSPR",
         # "TATAMOTORS",
         # "NTPC",
         # "BAJAJFINSV",
