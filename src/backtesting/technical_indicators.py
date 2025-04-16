@@ -2,7 +2,7 @@ from typing import Dict
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from utils.talib_loader import talib_module as ta
+import talib as ta
 from src.backtesting.data_loader import DataLoader
 from pydantic import BaseModel
 from utils.app_logger import setup_logger
