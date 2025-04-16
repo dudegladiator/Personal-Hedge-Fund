@@ -9,7 +9,7 @@ groq_api_manager = APIKeyManager(
 
 google_api_manager = APIKeyManager(
     api_keys=settings.google_api_keys,
-    rate_limit=10,
+    rate_limit=5,
     cooldown_period=60
 )
 

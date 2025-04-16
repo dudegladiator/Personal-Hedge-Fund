@@ -713,7 +713,8 @@ def get_balance_sheet_data(
                 if value != "" and key != "":
                     try:
                         # Remove commas and convert to float
-                        clean_value = value.replace(',', '')
+                        if type(value) == str:
+                            clean_value = value.replace('%', '').replace(',', '')
                         period_metrics[key.lower().replace(' ', '_')] = float(clean_value)
                     except ValueError:
                         # If conversion fails, store original value
@@ -1695,10 +1696,10 @@ if __name__ == "__main__":
     # # Pharmaceutical Sector
     # test_company_data("SUNPHARMA", "Pharmaceuticals")
     
-    # get_overall_fundamental_data("RELIANCE", "nse")
+    get_overall_fundamental_data("PATANJALI", "nse")
     
     # print(get_balance_sheet_data("IRCTC", "nse"))
     
-    print(get_live_indices_pricing())
+    # print(get_live_indices_pricing())
  
     pass

@@ -14,6 +14,7 @@ from src.data_source.apis_2 import get_live_indices_pricing
 from src.data_source.apis_3 import get_tickertape_movers, search_tickertape_stocks
 from src.routers.auth import authenticate_user
 from src.routers.trading import add_funds_to_portfolio, execute_paper_trade, get_detailed_paper_portfolio, get_paper_portfolio, get_paper_transactions
+import utils.runner
 
 # --- Constants ---
 PAGE_LOGIN = "login"

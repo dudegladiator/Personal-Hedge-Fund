@@ -8,6 +8,7 @@ from utils.app_logger import setup_logger
 from src.prompts import fundamental_agent_system_prompt
 import math
 from utils.llm import parse_fundamental_response
+from utils.util import _safe_get_float
 
 logger = setup_logger("src/agents/fundamental_agent.py")
 
@@ -72,164 +73,181 @@ def calculate_z_score_and_points(value: Optional[float], mean: float, std_dev: f
     return round(z_score, 2), points
 
 def compute_operating_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Computes operating ratios, assigns scores using Z-score, calculates confidence level, and classifies financial health."""
+    """Computes operating ratios safely, handling missing/invalid data."""
     results: Dict[str, Any] = {"Parameters": {}, "Confidence Level (%)": 0, "Signal": "Error", "Z-Scores": {}, "Points": {}}
+    values = {} # Initialize values dict here
     try:
-        data = fundamental_data
-        balance_sheet = data.get("balance_sheet", {}).get("periods")
-        profit_loss = data.get("profit_loss", {}).get("periods")
+        balance_sheet_periods = fundamental_data.get("balance_sheet", {}).get("periods", {})
+        profit_loss_periods = fundamental_data.get("profit_loss", {}).get("periods", {})
 
-        if not balance_sheet or not profit_loss:
-            raise ValueError("Missing balance_sheet or profit_loss data")
+        if not balance_sheet_periods or not profit_loss_periods:
+            raise ValueError("Missing balance_sheet or profit_loss periods data")
 
-        # --- Calculate Averages ---
-        total_assets_list = [p.get("total_assets") for p in balance_sheet.values() if p.get("total_assets") is not None]
-        net_fixed_assets_list = [(p.get("total_assets", 0) - p.get("total_current_assets", 0)) for p in balance_sheet.values() if p.get("total_assets") is not None and p.get("total_current_assets") is not None]
-        working_capital_list = [(p.get("total_current_assets", 0) - p.get("total_current_liabilities", 0)) for p in balance_sheet.values() if p.get("total_current_assets") is not None and p.get("total_current_liabilities") is not None]
-        inventory_list = [p.get("inventories") for p in balance_sheet.values() if p.get("inventories") is not None]
+        # --- Safely Calculate Averages ---
+        total_assets_list = [_safe_get_float(p, "total_assets") for p in balance_sheet_periods.values()]
+        total_current_assets_list = [_safe_get_float(p, "total_current_assets") for p in balance_sheet_periods.values()]
+        total_current_liabilities_list = [_safe_get_float(p, "total_current_liabilities") for p in balance_sheet_periods.values()]
+        inventory_list = [_safe_get_float(p, "inventories") for p in balance_sheet_periods.values()]
 
-        avg_total_assets = statistics.mean(total_assets_list) if total_assets_list else 0
-        avg_net_fixed_assets = statistics.mean(net_fixed_assets_list) if net_fixed_assets_list else 0
-        avg_working_capital = statistics.mean(working_capital_list) if working_capital_list else 0
-        avg_inventory = statistics.mean(inventory_list) if inventory_list else 0
+        # Filter None before calculating stats
+        valid_total_assets = [v for v in total_assets_list if v is not None]
+        valid_inventories = [v for v in inventory_list if v is not None]
 
-        # --- Extract Latest Period Values ---
-        latest_pl_period_key = sorted(profit_loss.keys())[-1]
-        latest_pl = profit_loss[latest_pl_period_key]
+        # Calculate working capital safely for each period first
+        working_capital_list = []
+        for ca, cl in zip(total_current_assets_list, total_current_liabilities_list):
+            if ca is not None and cl is not None:
+                working_capital_list.append(ca - cl)
+            # else: # Optionally handle pairs where one is None if needed
+            #     pass
 
-        net_sales = latest_pl.get("net_sales")
-        # COGS Proxy: Sum of material, power, employee costs
-        cogs_proxy = latest_pl.get("raw_materials_consumed", 0) + latest_pl.get("power_&_fuel_cost", 0) + latest_pl.get("employee_cost", 0)
+        # Calculate net fixed assets safely for each period
+        net_fixed_assets_list = []
+        for ta, tca in zip(total_assets_list, total_current_assets_list):
+             if ta is not None and tca is not None:
+                 net_fixed_assets_list.append(ta - tca)
 
-        # --- Calculate Ratios ---
-        # Corrected: Net Sales / Avg Net Fixed Assets
-        fixed_asset_turnover = net_sales / avg_net_fixed_assets if avg_net_fixed_assets and net_sales is not None else None
-        # Correct: Net Sales / Avg Working Capital
-        working_capital_turnover = net_sales / avg_working_capital if avg_working_capital and net_sales is not None else None
-        # Corrected: Net Sales / Avg Total Assets
-        total_asset_turnover = net_sales / avg_total_assets if avg_total_assets and net_sales is not None else None
-        # Using COGS Proxy / Avg Inventory
-        inventory_turnover = cogs_proxy / avg_inventory if avg_inventory and cogs_proxy is not None else None
+        avg_total_assets = statistics.mean(valid_total_assets) if len(valid_total_assets) > 0 else None
+        avg_net_fixed_assets = statistics.mean(net_fixed_assets_list) if len(net_fixed_assets_list) > 0 else None
+        avg_working_capital = statistics.mean(working_capital_list) if len(working_capital_list) > 0 else None
+        avg_inventory = statistics.mean(valid_inventories) if len(valid_inventories) > 0 else None
+
+        # --- Extract Latest Period Values Safely ---
+        latest_pl_period_key = sorted(profit_loss_periods.keys())[-1]
+        latest_pl = profit_loss_periods.get(latest_pl_period_key, {})
+
+        net_sales = _safe_get_float(latest_pl, "net_sales")
+        # COGS Proxy: Treat missing components as 0 cost
+        cogs_proxy = (_safe_get_float(latest_pl, "raw_materials_consumed") or 0.0) + \
+                     (_safe_get_float(latest_pl, "power_&_fuel_cost") or 0.0) + \
+                     (_safe_get_float(latest_pl, "employee_cost") or 0.0)
+        if cogs_proxy == 0.0: cogs_proxy = None # If all components were missing/zero, set proxy to None
+
+        # --- Calculate Ratios Safely ---
+        fixed_asset_turnover = (net_sales / avg_net_fixed_assets) if net_sales is not None and avg_net_fixed_assets is not None and avg_net_fixed_assets != 0 else None
+        working_capital_turnover = (net_sales / avg_working_capital) if net_sales is not None and avg_working_capital is not None and avg_working_capital != 0 else None
+        total_asset_turnover = (net_sales / avg_total_assets) if net_sales is not None and avg_total_assets is not None and avg_total_assets != 0 else None
+        inventory_turnover = (cogs_proxy / avg_inventory) if cogs_proxy is not None and avg_inventory is not None and avg_inventory != 0 else None
 
         values = {
-            "Fixed Asset Turnover": round(fixed_asset_turnover, 2) if fixed_asset_turnover is not None else None,
-            "Working Capital Turnover": round(working_capital_turnover, 2) if working_capital_turnover is not None else None,
-            "Total Asset Turnover": round(total_asset_turnover, 2) if total_asset_turnover is not None else None,
-            "Inventory Turnover (COGS Proxy)": round(inventory_turnover, 2) if inventory_turnover is not None else None
+            "Fixed Asset Turnover": fixed_asset_turnover,
+            "Working Capital Turnover": working_capital_turnover,
+            "Total Asset Turnover": total_asset_turnover,
+            "Inventory Turnover (COGS Proxy)": inventory_turnover
         }
-        results["Parameters"] = {k: v if v is not None else "N/A" for k, v in values.items()}
+        # Round only if not None
+        results["Parameters"] = {k: round(v, 2) if v is not None else "N/A" for k, v in values.items()}
 
-        # --- Z-Score Parameters (Mean, Std Dev, Type) ---
-        # Type: 'range', 'higher', 'lower'
-        # Mean: Midpoint of typical healthy range
-        # Std Dev: Half the width of the typical healthy range (adjust as needed)
+        # --- Z-Score Parameters (Keep as before) ---
         z_score_params = {
-            "Fixed Asset Turnover": {"mean": 2.25, "std_dev": 0.75, "type": "higher"}, # e.g., Ideal > 1.5-3.0
-            "Working Capital Turnover": {"mean": 6.0, "std_dev": 2.0, "type": "higher"}, # e.g., Ideal > 4-8
-            "Total Asset Turnover": {"mean": 1.0, "std_dev": 0.5, "type": "higher"}, # e.g., Ideal > 0.5-1.5 (Varies greatly by industry)
-            "Inventory Turnover (COGS Proxy)": {"mean": 5.0, "std_dev": 2.0, "type": "higher"} # e.g., Ideal > 3-7
+            "Fixed Asset Turnover": {"mean": 2.25, "std_dev": 0.75, "type": "higher"},
+            "Working Capital Turnover": {"mean": 6.0, "std_dev": 2.0, "type": "higher"},
+            "Total Asset Turnover": {"mean": 1.0, "std_dev": 0.5, "type": "higher"},
+            "Inventory Turnover (COGS Proxy)": {"mean": 5.0, "std_dev": 2.0, "type": "higher"}
         }
 
-        # --- Scoring System ---
+        # --- Scoring System (Keep as before, calculate_z_score handles None) ---
         total_points = 0
         max_points = 0
         z_scores = {}
         points_dict = {}
-
         for key, params in z_score_params.items():
-            value = values.get(key)
+            value = values.get(key) # Will be None if calculation failed
             z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
             total_points += points
-            max_points += 2 # Max 2 points per metric
+            max_points += 2
             z_scores[key] = z_score if z_score is not None else "N/A"
             points_dict[key] = points
 
         results["Z-Scores"] = z_scores
         results["Points"] = points_dict
 
-        # --- Calculate Confidence Level & Signal ---
+        # --- Calculate Confidence Level & Signal (Keep as before) ---
         confidence_level = round((total_points / max_points) * 100, 2) if max_points > 0 else 0
         results["Confidence Level (%)"] = confidence_level
-
-        if confidence_level >= 75: # Adjusted threshold for Z-score
-            signal = "BULLISH"
-        elif confidence_level >= 45: # Adjusted threshold
-            signal = "NEUTRAL"
-        else:
-            signal = "BEARISH"
+        if confidence_level >= 75: signal = "BULLISH"
+        elif confidence_level >= 45: signal = "NEUTRAL"
+        else: signal = "BEARISH"
         results["Signal"] = signal
-
     except Exception as e:
-        logger.error(f"Error computing operating ratios: {e}", exc_info=True)
-        results["Signal"] = f"Error: {e}"
+        # logger.error(f"Error computing operating ratios: {e}", exc_info=True) # Use your logger
+        print(f"Error computing operating ratios: {e}") # Placeholder if logger not available
+        results["Signal"] = f"Error: {str(e)[:100]}" # Keep error message concise
+        # Ensure Parameters dict reflects calculation failure if values dict wasn't populated
+        if not values:
+             results["Parameters"] = {
+                "Fixed Asset Turnover": "Error",
+                "Working Capital Turnover": "Error",
+                "Total Asset Turnover": "Error",
+                "Inventory Turnover (COGS Proxy)": "Error"
+            }
+
 
     return results
-
+        
 def calculate_profitability_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Calculates profitability ratios, assigns scores using Z-score, calculates confidence level, and classifies financial health."""
+    """Calculates profitability ratios safely, handling missing/invalid data."""
     results: Dict[str, Any] = {"Parameters": {}, "Confidence Level (%)": 0, "Signal": "Error", "Z-Scores": {}, "Points": {}}
+    values = {}
     try:
-        data = fundamental_data
-        profit_loss_periods = data.get("profit_loss", {}).get("periods")
-        yearly_periods = data.get("yearly", {}).get("periods")
-        stock_quality = data.get("stock_quality", {}).get("quality_ratios", {})
-        balance_sheet_periods = data.get("balance_sheet", {}).get("periods")
+        profit_loss_periods = fundamental_data.get("profit_loss", {}).get("periods", {})
+        yearly_periods = fundamental_data.get("yearly", {}).get("periods", {})
+        stock_quality = fundamental_data.get("stock_quality", {}).get("quality_ratios", {})
+        balance_sheet_periods = fundamental_data.get("balance_sheet", {}).get("periods", {})
 
         if not profit_loss_periods or not yearly_periods or not balance_sheet_periods:
              raise ValueError("Missing profit_loss, yearly, or balance_sheet data")
 
         latest_pl_key = sorted(profit_loss_periods.keys())[-1]
-        latest_pl = profit_loss_periods[latest_pl_key]
+        latest_pl = profit_loss_periods.get(latest_pl_key, {})
         latest_yearly_key = sorted(yearly_periods.keys())[-1]
-        latest_yearly = yearly_periods[latest_yearly_key]
+        latest_yearly = yearly_periods.get(latest_yearly_key, {})
 
-        # --- Calculate Averages ---
-        total_assets_list = [p.get("total_assets") for p in balance_sheet_periods.values() if p.get("total_assets") is not None]
-        avg_total_assets = statistics.mean(total_assets_list) if total_assets_list else 0
+        # --- Calculate Averages Safely ---
+        total_assets_list = [_safe_get_float(p, "total_assets") for p in balance_sheet_periods.values()]
+        valid_total_assets = [v for v in total_assets_list if v is not None]
+        avg_total_assets = statistics.mean(valid_total_assets) if len(valid_total_assets) > 0 else None
 
-        # --- Extract Values ---
-        net_sales = latest_pl.get("net_sales")
-        # Use Operating Profit PBDIT as proxy for EBITDA
-        operating_profit_pbdit = latest_pl.get("operating_profit_(pbdit)")
-        profit_after_tax = latest_pl.get("profit_after_tax")
-        interest = latest_pl.get("interest", 0) # Default interest to 0 if missing
-        # Assuming a constant tax rate for ROA calculation if not directly available
-        tax_rate = 0.25
+        # --- Extract Values Safely ---
+        net_sales = _safe_get_float(latest_pl, "net_sales")
+        operating_profit_pbdit = _safe_get_float(latest_pl, "operating_profit_(pbdit)")
+        profit_after_tax = _safe_get_float(latest_pl, "profit_after_tax")
+        # Treat missing interest as 0 for ROA calculation, but None otherwise if needed
+        interest = _safe_get_float(latest_pl, "interest") or 0.0
+        tax_rate = 0.25 # Assuming constant
 
-        pat_margin = latest_yearly.get("pat_margin") # From yearly data
-        roe_avg = stock_quality.get("roe_avg") # From stock quality data
-        roce_avg = stock_quality.get("roce_avg") # From stock quality data
+        pat_margin = _safe_get_float(latest_yearly, "pat_margin") # From yearly data
+        # Use _safe_get_float for stock quality ratios too
+        roe_avg = _safe_get_float(stock_quality, "roe_avg")
+        roce_avg = _safe_get_float(stock_quality, "roce_avg")
 
-        # --- Calculate Metrics ---
-        # Corrected: Use PBDIT / Net Sales for EBITDA Margin Proxy
-        ebitda_margin = (operating_profit_pbdit / net_sales) * 100 if net_sales and operating_profit_pbdit is not None else None
-        # ROA: (PAT + Interest * (1 - Tax Rate)) / Avg Total Assets
-        roa = ((profit_after_tax + interest * (1 - tax_rate)) / avg_total_assets) * 100 if avg_total_assets and profit_after_tax is not None else None
+        # --- Calculate Metrics Safely ---
+        ebitda_margin = (operating_profit_pbdit / net_sales * 100) if net_sales is not None and net_sales != 0 and operating_profit_pbdit is not None else None
+        roa = ((profit_after_tax + interest * (1 - tax_rate)) / avg_total_assets * 100) if avg_total_assets is not None and avg_total_assets != 0 and profit_after_tax is not None else None
 
         values = {
-            "EBITDA Margin (%)": round(ebitda_margin, 2) if ebitda_margin is not None else None,
-            "PAT Margin (%)": round(pat_margin, 2) if pat_margin is not None else None,
-            "ROE Avg (%)": round(roe_avg, 2) if roe_avg is not None else None,
-            "ROCE Avg (%)": round(roce_avg, 2) if roce_avg is not None else None,
-            "ROA (%)": round(roa, 2) if roa is not None else None
+            "EBITDA Margin (%)": ebitda_margin,
+            "PAT Margin (%)": pat_margin, # Already a percentage
+            "ROE Avg (%)": roe_avg,       # Already a percentage
+            "ROCE Avg (%)": roce_avg,     # Already a percentage
+            "ROA (%)": roa
         }
-        results["Parameters"] = {k: v if v is not None else "N/A" for k, v in values.items()}
+        results["Parameters"] = {k: round(v, 2) if v is not None else "N/A" for k, v in values.items()}
 
-        # --- Z-Score Parameters ---
+        # --- Z-Score Parameters (Keep as before) ---
         z_score_params = {
-            "EBITDA Margin (%)": {"mean": 20.0, "std_dev": 5.0, "type": "higher"}, # e.g., Ideal > 15-25%
-            "PAT Margin (%)": {"mean": 10.0, "std_dev": 5.0, "type": "higher"},    # e.g., Ideal > 5-15%
-            "ROE Avg (%)": {"mean": 16.0, "std_dev": 4.0, "type": "higher"},       # e.g., Ideal > 12-20%
-            "ROCE Avg (%)": {"mean": 14.0, "std_dev": 4.0, "type": "higher"},      # e.g., Ideal > 10-18%
-            "ROA (%)": {"mean": 7.5, "std_dev": 2.5, "type": "higher"}             # e.g., Ideal > 5-10%
+            "EBITDA Margin (%)": {"mean": 20.0, "std_dev": 5.0, "type": "higher"},
+            "PAT Margin (%)": {"mean": 10.0, "std_dev": 5.0, "type": "higher"},
+            "ROE Avg (%)": {"mean": 16.0, "std_dev": 4.0, "type": "higher"},
+            "ROCE Avg (%)": {"mean": 14.0, "std_dev": 4.0, "type": "higher"},
+            "ROA (%)": {"mean": 7.5, "std_dev": 2.5, "type": "higher"}
         }
 
-        # --- Scoring System ---
+        # --- Scoring System (Keep as before) ---
         total_points = 0
         max_points = 0
         z_scores = {}
         points_dict = {}
-
         for key, params in z_score_params.items():
             value = values.get(key)
             z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
@@ -241,212 +259,211 @@ def calculate_profitability_ratios(fundamental_data: Dict[str, Any]) -> Dict[str
         results["Z-Scores"] = z_scores
         results["Points"] = points_dict
 
-        # --- Calculate Confidence Level & Signal ---
+        # --- Calculate Confidence Level & Signal (Keep as before) ---
         confidence_level = round((total_points / max_points) * 100, 2) if max_points > 0 else 0
         results["Confidence Level (%)"] = confidence_level
-
-        if confidence_level >= 75:
-            signal = "BULLISH"
-        elif confidence_level >= 45:
-            signal = "NEUTRAL"
-        else:
-            signal = "BEARISH"
+        if confidence_level >= 75: signal = "BULLISH"
+        elif confidence_level >= 45: signal = "NEUTRAL"
+        else: signal = "BEARISH"
         results["Signal"] = signal
 
     except Exception as e:
-        logger.error(f"Error calculating profitability ratios: {e}", exc_info=True)
-        results["Signal"] = f"Error: {e}"
+        # logger.error(f"Error calculating profitability ratios: {e}", exc_info=True)
+        print(f"Error calculating profitability ratios: {e}")
+        results["Signal"] = f"Error: {str(e)[:100]}"
+        if not values:
+             results["Parameters"] = { # Default to error if calculation failed early
+                "EBITDA Margin (%)": "Error", "PAT Margin (%)": "Error", "ROE Avg (%)": "Error",
+                "ROCE Avg (%)": "Error", "ROA (%)": "Error"
+             }
 
     return results
 
 def compute_leverage_ratios(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Computes leverage ratios, assigns scores using Z-score, calculates confidence level, and classifies financial health."""
+    """Computes leverage ratios safely, handling missing/invalid data."""
     results: Dict[str, Any] = {"Parameters": {}, "Confidence Level (%)": 0, "Signal": "Error", "Z-Scores": {}, "Points": {}}
+    values = {}
     try:
-        data = fundamental_data
-        balance_sheet = data.get("balance_sheet", {}).get("periods")
-        profit_loss = data.get("profit_loss", {}).get("periods")
-        stock_quality = data.get("stock_quality", {}).get("quality_ratios", {})
+        balance_sheet_periods = fundamental_data.get("balance_sheet", {}).get("periods", {})
+        profit_loss_periods = fundamental_data.get("profit_loss", {}).get("periods", {})
+        stock_quality = fundamental_data.get("stock_quality", {}).get("quality_ratios", {})
 
-        if not balance_sheet or not profit_loss:
-            raise ValueError("Missing balance_sheet or profit_loss data")
+        if not balance_sheet_periods or not profit_loss_periods:
+            raise ValueError("Missing balance_sheet or profit_loss periods data")
 
-        latest_pl_key = sorted(profit_loss.keys())[-1]
-        latest_pl = profit_loss[latest_pl_key]
-        latest_bs_key = sorted(balance_sheet.keys())[-1]
-        latest_bs = balance_sheet[latest_bs_key]
+        latest_pl_key = sorted(profit_loss_periods.keys())[-1]
+        latest_pl = profit_loss_periods.get(latest_pl_key, {})
+        latest_bs_key = sorted(balance_sheet_periods.keys())[-1]
+        latest_bs = balance_sheet_periods.get(latest_bs_key, {})
 
-        # --- Extract Values ---
-        pbdit = latest_pl.get("operating_profit_(pbdit)")
-        depreciation = latest_pl.get("depreciation", 0) # Default depreciation to 0 if missing
-        interest = latest_pl.get("interest")
-        # EBIT approximation
-        ebit = pbdit - depreciation if pbdit is not None else None
+        # --- Extract Values Safely ---
+        pbdit = _safe_get_float(latest_pl, "operating_profit_(pbdit)")
+        depreciation = _safe_get_float(latest_pl, "depreciation") or 0.0 # Treat missing depreciation as 0
+        interest = _safe_get_float(latest_pl, "interest")
+        ebit = (pbdit - depreciation) if pbdit is not None else None
 
-        # Debt-to-Equity Ratio (using net debt from stock quality if available)
-        debt_to_equity = stock_quality.get("net_debt_to_equity_avg")
+        debt_to_equity = _safe_get_float(stock_quality, "net_debt_to_equity_avg")
+        total_debt = _safe_get_float(latest_bs, "total_debt")
+        total_assets_latest = _safe_get_float(latest_bs, "total_assets")
 
-        # Debt-to-Asset Ratio
-        total_debt = latest_bs.get("total_debt")
-        total_assets_latest = latest_bs.get("total_assets")
+        # --- Calculate Averages Safely ---
+        total_assets_list = [_safe_get_float(p, "total_assets") for p in balance_sheet_periods.values()]
+        total_equity_list = [_safe_get_float(p, "shareholder's_funds") for p in balance_sheet_periods.values()] # Proxy
 
-        # Financial Leverage Ratio (Average Total Assets / Average Total Equity)
-        total_assets_list = [p.get("total_assets") for p in balance_sheet.values() if p.get("total_assets") is not None]
-        # Use shareholder's_funds as proxy for total equity
-        total_equity_list = [p.get("shareholder's_funds") for p in balance_sheet.values() if p.get("shareholder's_funds") is not None]
+        valid_total_assets = [v for v in total_assets_list if v is not None]
+        valid_total_equity = [v for v in total_equity_list if v is not None]
 
-        avg_total_assets = statistics.mean(total_assets_list) if total_assets_list else 0
-        avg_total_equity = statistics.mean(total_equity_list) if total_equity_list else 0
+        avg_total_assets = statistics.mean(valid_total_assets) if len(valid_total_assets) > 0 else None
+        avg_total_equity = statistics.mean(valid_total_equity) if len(valid_total_equity) > 0 else None
 
-        # --- Calculate Ratios ---
-        # Interest Coverage Ratio: EBIT / Interest
-        interest_coverage_ratio = ebit / interest if interest and ebit is not None and interest != 0 else None
-        # Debt-to-Asset Ratio: Total Debt / Total Assets (Latest)
-        debt_to_asset_ratio = total_debt / total_assets_latest if total_assets_latest and total_debt is not None and total_assets_latest != 0 else None
-        # Financial Leverage Ratio: Avg Total Assets / Avg Total Equity
-        financial_leverage_ratio = avg_total_assets / avg_total_equity if avg_total_equity and avg_total_equity != 0 else None
+        # --- Calculate Ratios Safely ---
+        interest_coverage_ratio = (ebit / interest) if ebit is not None and interest is not None and interest != 0 else None
+        debt_to_asset_ratio = (total_debt / total_assets_latest) if total_debt is not None and total_assets_latest is not None and total_assets_latest != 0 else None
+        financial_leverage_ratio = (avg_total_assets / avg_total_equity) if avg_total_assets is not None and avg_total_equity is not None and avg_total_equity != 0 else None
+
+        # print(f"Debt to Equity: {debt_to_equity}, Financial Leverage Ratio: {financial_leverage_ratio}, Debt to Asset Ratio: {debt_to_asset_ratio}, Interest Coverage Ratio: {interest_coverage_ratio}")
 
         values = {
-            "Interest Coverage Ratio": round(interest_coverage_ratio, 2) if interest_coverage_ratio is not None else None,
-            "Net Debt-to-Equity Avg": round(debt_to_equity, 2) if debt_to_equity is not None else None, # Renamed for clarity
-            "Debt-to-Asset Ratio": round(debt_to_asset_ratio, 2) if debt_to_asset_ratio is not None else None,
-            "Financial Leverage Ratio": round(financial_leverage_ratio, 2) if financial_leverage_ratio is not None else None
+            "Interest Coverage Ratio": interest_coverage_ratio,
+            "Net Debt-to-Equity Avg": debt_to_equity,
+            "Debt-to-Asset Ratio": debt_to_asset_ratio,
+            "Financial Leverage Ratio": financial_leverage_ratio
         }
-        results["Parameters"] = {k: v if v is not None else "N/A" for k, v in values.items()}
+        results["Parameters"] = {k: round(v, 2) if v is not None else "N/A" for k, v in values.items()}
 
-        # --- Z-Score Parameters ---
-        # Note: For ratios where lower is better, the 'type' is 'lower'.
+        # --- Z-Score Parameters (Keep as before) ---
         z_score_params = {
-            "Interest Coverage Ratio": {"mean": 4.0, "std_dev": 1.0, "type": "higher"}, # e.g., Ideal > 3-5
-            "Net Debt-to-Equity Avg": {"mean": 1.0, "std_dev": 0.5, "type": "lower"},  # e.g., Ideal < 0.5-1.5 (Lower is better)
-            "Debt-to-Asset Ratio": {"mean": 0.45, "std_dev": 0.15, "type": "lower"}, # e.g., Ideal < 0.3-0.6 (Lower is better)
-            "Financial Leverage Ratio": {"mean": 2.0, "std_dev": 0.5, "type": "range"} # e.g., Ideal around 1.5-2.5 (Range is okay)
+            "Interest Coverage Ratio": {"mean": 4.0, "std_dev": 1.0, "type": "higher"},
+            "Net Debt-to-Equity Avg": {"mean": 1.0, "std_dev": 0.5, "type": "lower"},
+            "Debt-to-Asset Ratio": {"mean": 0.45, "std_dev": 0.15, "type": "lower"},
+            "Financial Leverage Ratio": {"mean": 2.0, "std_dev": 0.5, "type": "range"}
         }
 
-        # --- Scoring System ---
+        # --- Scoring System (Keep as before, handles D/E < 0) ---
         total_points = 0
         max_points = 0
         z_scores = {}
         points_dict = {}
-
         for key, params in z_score_params.items():
             value = values.get(key)
-            # Special handling for D/E - if it's negative (meaning cash > debt), treat as very good (low leverage)
+            z_score, points = None, 0 # Default
             if key == "Net Debt-to-Equity Avg" and isinstance(value, (int, float)) and value < 0:
                  z_score, points = None, 2 # Assign max points directly
+                 z_scores[key] = "Negative (Good)"
+                 points_dict[key] = points
             else:
                 z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
+                z_scores[key] = z_score if z_score is not None else "N/A"
+                points_dict[key] = points
 
             total_points += points
             max_points += 2
-            z_scores[key] = z_score if z_score is not None else ("N/A" if key != "Net Debt-to-Equity Avg" or value >= 0 else "Negative (Good)")
-            points_dict[key] = points
-
 
         results["Z-Scores"] = z_scores
         results["Points"] = points_dict
 
-        # --- Calculate Confidence Level & Signal ---
+        # --- Calculate Confidence Level & Signal (Keep as before) ---
         confidence_level = round((total_points / max_points) * 100, 2) if max_points > 0 else 0
         results["Confidence Level (%)"] = confidence_level
-
-        if confidence_level >= 75:
-            signal = "BULLISH" # Lower leverage generally viewed positively
-        elif confidence_level >= 45:
-            signal = "NEUTRAL"
-        else:
-            signal = "BEARISH" # Higher leverage viewed negatively
+        if confidence_level >= 75: signal = "BULLISH" # Low leverage good
+        elif confidence_level >= 45: signal = "NEUTRAL"
+        else: signal = "BEARISH" # High leverage bad
         results["Signal"] = signal
 
     except Exception as e:
-        logger.error(f"Error computing leverage ratios: {e}", exc_info=True)
-        results["Signal"] = f"Error: {e}"
+        # logger.error(f"Error computing leverage ratios: {e}", exc_info=True)
+        print(f"Error computing leverage ratios: {e}")
+        results["Signal"] = f"Error: {str(e)[:100]}"
+        if not values:
+            results["Parameters"] = { # Default to error
+                "Interest Coverage Ratio": "Error", "Net Debt-to-Equity Avg": "Error",
+                "Debt-to-Asset Ratio": "Error", "Financial Leverage Ratio": "Error"
+            }
 
     return results
 
 def compute_company_stability(fundamental_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Computes company stability metrics, assigns scores using Z-score, calculates confidence level, and classifies stability."""
+    """Computes company stability metrics safely, handling missing/invalid data."""
     results: Dict[str, Any] = {"Metrics": {}, "Confidence Level (%)": 0, "Signal": "Error", "Z-Scores": {}, "Points": {}}
+    metrics = {} # Initialize metrics dict here
     try:
-        data = fundamental_data
-        cash_flow = data.get("cash_flow", {}).get("periods")
-        yearly_data = data.get("yearly", {}).get("periods")
-        balance_sheet = data.get("balance_sheet", {}).get("periods")
-        stock_quality = data.get("stock_quality", {}).get("quality_ratios", {})
-        shareholding = data.get("shareholding_pattern", {}).get("periods")
+        cash_flow_periods = fundamental_data.get("cash_flow", {}).get("periods", {})
+        yearly_periods = fundamental_data.get("yearly", {}).get("periods", {})
+        balance_sheet_periods = fundamental_data.get("balance_sheet", {}).get("periods", {})
+        stock_quality = fundamental_data.get("stock_quality", {}).get("quality_ratios", {})
+        shareholding_periods = fundamental_data.get("shareholding_pattern", {}).get("periods", {})
 
-        if not cash_flow or not yearly_data or not balance_sheet or not shareholding:
-            raise ValueError("Missing cash_flow, yearly, balance_sheet, or shareholding data")
+        # Check only essential period data
+        if not cash_flow_periods or not yearly_periods or not balance_sheet_periods or not shareholding_periods:
+            raise ValueError("Missing essential periods data (cash_flow, yearly, balance_sheet, or shareholding)")
 
-        # --- Extract Growth Metrics ---
-        sales_growth_5y = stock_quality.get("sales_growth_5y")
-        ebit_growth_5y = stock_quality.get("ebit_growth_5y")
-        dividend_payout_ratio = stock_quality.get("dividend_payout_ratio") # Use latest or average? Using value from stock_quality
+        # --- Extract Growth Metrics Safely ---
+        metrics["Sales Growth 5Y (%)"] = _safe_get_float(stock_quality, "sales_growth_5y")
+        metrics["EBIT Growth 5Y (%)"] = _safe_get_float(stock_quality, "ebit_growth_5y")
+        metrics["Dividend Payout Ratio (%)"] = _safe_get_float(stock_quality, "dividend_payout_ratio")
 
-        # --- Calculate Stability Metrics ---
-        metrics = {}
-        metrics["Sales Growth 5Y (%)"] = sales_growth_5y
-        metrics["EBIT Growth 5Y (%)"] = ebit_growth_5y
-        metrics["Dividend Payout Ratio (%)"] = dividend_payout_ratio
+        # --- Calculate Stability Metrics Safely ---
 
-        # 1. Cash Flow Stability (Positive Operating Cash Flow %)
-        # *** IMPORTANT: Adjust 'net_cash_from_operating_activities' to the actual field name in your data ***
-        ocf_field = 'net_cash_from_operating_activities'
-        ocf_list = [p.get(ocf_field) for p in cash_flow.values() if p.get(ocf_field) is not None]
-        if not ocf_list:
-             logger.warning(f"OCF field '{ocf_field}' not found or empty in cash_flow data.")
+        # 1. Cash Flow Stability
+        ocf_field = 'cash_flow_from_operating_activities'
+        ocf_list = [_safe_get_float(p, ocf_field) for p in cash_flow_periods.values()]
+        valid_ocf_list = [v for v in ocf_list if v is not None]
+
+        if not valid_ocf_list:
+             # logger.warning(f"OCF field '{ocf_field}' not found or only contains invalid data.")
+             print(f"Warning: OCF field '{ocf_field}' not found or only contains invalid data.")
              metrics["Cash Flow Stability (% Positive OCF)"] = None
         else:
-            positive_ocf_count = sum(1 for ocf in ocf_list if ocf > 0)
-            ocf_percentage = (positive_ocf_count / len(ocf_list)) * 100 if ocf_list else 0
-            metrics["Cash Flow Stability (% Positive OCF)"] = round(ocf_percentage, 2)
+            positive_ocf_count = sum(1 for ocf in valid_ocf_list if ocf > 0)
+            ocf_percentage = (positive_ocf_count / len(valid_ocf_list)) * 100
+            metrics["Cash Flow Stability (% Positive OCF)"] = ocf_percentage # Already a percentage
 
-        # Helper for calculating stability (Coefficient of Variation)
+        # Helper for calculating stability (CV %) - Safe version
         def calculate_stability_metric(data_list: list) -> Optional[float]:
-            if len(data_list) < 2: return None # Need at least 2 points for stdev
+            valid_data = [v for v in data_list if v is not None] # Ensure only valid floats
+            if len(valid_data) < 2: return None
             try:
-                mean = statistics.mean(data_list)
-                if mean == 0: return 0.0 # Avoid division by zero if mean is 0
-                std_dev = statistics.stdev(data_list)
-                # Coefficient of Variation as %
-                cv = abs(std_dev / mean) * 100
-                return round(cv, 2)
-            except statistics.StatisticsError:
-                return None # Handle cases with insufficient data for stdev
+                mean = statistics.mean(valid_data)
+                if mean == 0: return 0.0 # Stable at zero
+                std_dev = statistics.stdev(valid_data)
+                cv = abs(std_dev / mean) * 100 # CV as percentage
+                return cv
+            except statistics.StatisticsError: # Should not happen if len >= 2, but belts and suspenders
+                return None
 
-        # 2. PAT Margin Stability (Lower CV is better)
-        pat_margin_list = [p.get("pat_margin") for p in yearly_data.values() if p.get("pat_margin") is not None]
+        # 2. PAT Margin Stability
+        pat_margin_list = [_safe_get_float(p, "pat_margin") for p in yearly_periods.values()]
         metrics["PAT Margin Stability (CV %)"] = calculate_stability_metric(pat_margin_list)
 
-        # 3. Debt Level Stability (Lower CV is better)
-        debt_list = [p.get("total_debt") for p in balance_sheet.values() if p.get("total_debt") is not None]
+        # 3. Debt Level Stability
+        debt_list = [_safe_get_float(p, "total_debt") for p in balance_sheet_periods.values()]
         metrics["Debt Level Stability (CV %)"] = calculate_stability_metric(debt_list)
 
-        # 4. Promoter Holding Stability (Lower CV is better)
-        promoter_list = [p.get("Total Promoter") for p in shareholding.values() if p.get("Total Promoter") is not None]
+        # 4. Promoter Holding Stability
+        promoter_field = "Total Promoter"
+        promoter_list = [_safe_get_float(p, promoter_field) for p in shareholding_periods.values()]
         metrics["Promoter Holding Stability (CV %)"] = calculate_stability_metric(promoter_list)
 
-        results["Metrics"] = {k: v if v is not None else "N/A" for k, v in metrics.items()}
+        results["Metrics"] = {k: round(v, 2) if v is not None else "N/A" for k, v in metrics.items()}
 
-        # --- Z-Score Parameters ---
+        # --- Z-Score Parameters (Keep as before) ---
         z_score_params = {
-            "Sales Growth 5Y (%)": {"mean": 12.5, "std_dev": 5.0, "type": "higher"}, # Target > 10-15%
-            "EBIT Growth 5Y (%)": {"mean": 15.0, "std_dev": 6.0, "type": "higher"},  # Target > 12-18%
-            "PAT Margin Stability (CV %)": {"mean": 15.0, "std_dev": 10.0, "type": "lower"}, # Target CV < 10-20% (Lower is better)
-            "Debt Level Stability (CV %)": {"mean": 20.0, "std_dev": 10.0, "type": "lower"}, # Target CV < 15-25% (Lower is better)
-            "Dividend Payout Ratio (%)": {"mean": 30.0, "std_dev": 15.0, "type": "range"}, # Target 20-40%, allow wider range
-            "Promoter Holding Stability (CV %)": {"mean": 2.5, "std_dev": 2.5, "type": "lower"}, # Target CV < 1-4% (Lower is better)
-            "Cash Flow Stability (% Positive OCF)": {"mean": 85.0, "std_dev": 15.0, "type": "higher"} # Target > 80-90%
+            "Sales Growth 5Y (%)": {"mean": 12.5, "std_dev": 5.0, "type": "higher"},
+            "EBIT Growth 5Y (%)": {"mean": 15.0, "std_dev": 6.0, "type": "higher"},
+            "PAT Margin Stability (CV %)": {"mean": 15.0, "std_dev": 10.0, "type": "lower"},
+            "Debt Level Stability (CV %)": {"mean": 20.0, "std_dev": 10.0, "type": "lower"},
+            "Dividend Payout Ratio (%)": {"mean": 30.0, "std_dev": 15.0, "type": "range"},
+            "Promoter Holding Stability (CV %)": {"mean": 2.5, "std_dev": 2.5, "type": "lower"},
+            "Cash Flow Stability (% Positive OCF)": {"mean": 85.0, "std_dev": 15.0, "type": "higher"}
         }
 
-        # --- Scoring System ---
+        # --- Scoring System (Keep as before) ---
         total_points = 0
         max_points = 0
         z_scores = {}
         points_dict = {}
-
         for key, params in z_score_params.items():
-            value = metrics.get(key)
+            value = metrics.get(key) # Value might be None if calculation failed
             z_score, points = calculate_z_score_and_points(value, params["mean"], params["std_dev"], params["type"])
             total_points += points
             max_points += 2
@@ -456,21 +473,25 @@ def compute_company_stability(fundamental_data: Dict[str, Any]) -> Dict[str, Any
         results["Z-Scores"] = z_scores
         results["Points"] = points_dict
 
-        # --- Calculate Confidence Level & Signal ---
+        # --- Calculate Confidence Level & Signal (Keep as before) ---
         confidence_level = round((total_points / max_points) * 100, 2) if max_points > 0 else 0
         results["Confidence Level (%)"] = confidence_level
-
-        if confidence_level >= 75:
-            signal = "BULLISH"
-        elif confidence_level >= 45:
-            signal = "NEUTRAL"
-        else:
-            signal = "BEARISH"
+        if confidence_level >= 75: signal = "BULLISH"
+        elif confidence_level >= 45: signal = "NEUTRAL"
+        else: signal = "BEARISH"
         results["Signal"] = signal
 
     except Exception as e:
-        logger.error(f"Error computing company stability: {e}", exc_info=True)
-        results["Signal"] = f"Error: {e}"
+        # logger.error(f"Error computing company stability: {e}", exc_info=True)
+        print(f"Error computing company stability: {e}")
+        results["Signal"] = f"Error: {str(e)[:100]}"
+        if not metrics: # Default to error if calculation failed early
+            results["Metrics"] = {
+                 "Sales Growth 5Y (%)": "Error", "EBIT Growth 5Y (%)": "Error",
+                 "Dividend Payout Ratio (%)": "Error", "Cash Flow Stability (% Positive OCF)": "Error",
+                 "PAT Margin Stability (CV %)": "Error", "Debt Level Stability (CV %)": "Error",
+                 "Promoter Holding Stability (CV %)": "Error"
+            }
 
     return results
 
@@ -636,7 +657,7 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         logger.info(f"Received LLM response for {symbol}.")
 
         # Attempt to parse the LLM output to ensure it's valid JSON
-        analyse = parse_fundamental_response(response.choices[0].message.content)
+        analyse = parse_fundamental_response(response.choices[0].message.content, raw_data = filtered_results)
         return analyse
 
     except Exception as e:
@@ -644,7 +665,22 @@ def fundamental_agent(symbol: str, exchange: str = "nse", force: bool = False, r
         return {"error": f"An error occurred during LLM interaction: {str(e)}"}
 
 if __name__ == "__main__":
-    symbol_to_test = "REDINGTON"
-    print(f"--- Running Fundamental Agent for {symbol_to_test} ---")
-    analysis_report_json = fundamental_agent(symbol_to_test, exchange="nse", force=True, refresh_days=30) # Increase refresh days for testing
-    print(analysis_report_json)
+    stock_codes = [
+        "INDUSINDBK",
+        # "PATANJALI",
+        # "ITC",
+        # "AMBUJACEM",
+        # "AXISBANK",
+        # "HEROMOTOCO",
+        # "HAL",
+        # "MCDOWELL-N",
+        # "TATAMOTORS",
+        # "NTPC",
+        # "BAJAJFINSV",
+        # "RELIANCE"
+    ]
+    for stock in stock_codes:
+        print(f"Running analysis for {stock}...")
+        result = fundamental_agent(stock)
+        print(f"Result for {stock}: {result}")
+        print("-" * 80)

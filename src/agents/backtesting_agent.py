@@ -9,16 +9,14 @@ from utils.app_logger import setup_logger
 from utils.config import get_sync_database
 from src.prompts import backtesting_strategy_system_prompt, backtesting_analysis_system_prompt, get_prompt_for_backtesting
 from src.backtesting.backtesting_engine import BacktestParameters, execute_backtesting
-from utils.llm import parse_backtesting_results
+from utils.llm import parse_backtesting_results, parse_strategy_code_response
 
 logger = setup_logger("src/agents/backtesing_agent.py")
 db = get_sync_database()
 
 MODEL_PROVIDER = "GEMINI"
-MODEL_NAME = "gemini-2.0-flash"
-# MODEL_PROVIDER = "GROQ"
-# MODEL_NAME = "llama-3.3-70b-versatile"
-FORMAT = { "type": "json_object" }
+MODEL_NAME = "gemini-2.0-flash-thinking-exp-01-21"
+FORMAT = { "type": "text" }
 
 def analyze_backtest_results(symbol, backtesting_results):
     logger.info(f"Starting backtest analysis for {symbol}")
@@ -44,7 +42,7 @@ Backtesting Results Data:
             temperature=0.6,
             response_format=FORMAT
         )
-        parsed_results = parse_backtesting_results(response_content=completion.choices[0].message.content)
+        parsed_results = parse_backtesting_results(response_content=completion.choices[0].message.content, raw_data =backtesting_results)
         
         logger.info(f"Successfully analyzed backtest results for {symbol}")
         return parsed_results
@@ -53,7 +51,8 @@ Backtesting Results Data:
         logger.error(f"Error analyzing backtest results for {symbol}: {str(e)}", exc_info=True)
         return {
             "error": True,
-            "message": str(e)
+            "details": str(e),
+            "raw_data": backtesting_results
         }
 
 def generate_strategy_code(symbol: str, exchange: str, force: bool = False):
@@ -92,11 +91,14 @@ def generate_strategy_code(symbol: str, exchange: str, force: bool = False):
             temperature=0.65,
             response_format=FORMAT
         )
-
-        response_content = json.loads(chat_completion.choices[0].message.content)
-        logger.info(f"Successfully generated strategy code for {symbol}")
-        return response_content
         
+        strategy_response = parse_strategy_code_response(chat_completion.choices[0].message.content)
+        if isinstance(strategy_response, dict) and strategy_response.get("error"):
+            logger.error(f"Strategy generation failed: {strategy_response.get('message')}")
+            return strategy_response
+            
+        logger.info(f"Successfully generated {len(strategy_response)} strategies for {symbol}")
+        return strategy_response
     except Exception as e:
         logger.error(f"Error generating strategy code for {symbol}: {str(e)}", exc_info=True)
         return {
@@ -108,25 +110,17 @@ def backtesting_agent(
     symbol: str,
     exchange: str = "nse",
     force: bool = False,
-    backtesting_days: int = 365*10
+    backtesting_days: int = 365*2
 ) -> Dict[str, Any]:
     logger.info(f"Starting backtesting agent for {symbol}")
     try:
-            
         # Generate strategy code
         strategy_response = generate_strategy_code(symbol, exchange, force=force)
-        
-        if isinstance(strategy_response, dict) and strategy_response.get("error"):
-            logger.error(f"Strategy generation failed: {strategy_response.get('message')}")
-            return strategy_response
-            
-        logger.info(f"Successfully generated {len(strategy_response)} strategies for {symbol}")
-        
+        strategy_response = strategy_response.get("strategies")
         # Test all strategies
         all_results = []
         for i, strategy_code in enumerate(strategy_response, 1):
             logger.info(f"Testing strategy {i} of {len(strategy_response)}")
-            
             params = BacktestParameters(
                 symbol=symbol,
                 strategy_code=strategy_code.get("strategy_code"),
@@ -138,18 +132,27 @@ def backtesting_agent(
             
             # Execute backtesting
             logger.debug(f"Executing backtest for strategy {i}")
-            backtest_results = execute_backtesting(params)
+            try:
+                backtest_results = execute_backtesting(params)
             
-            strategy_result = {
-                "strategy_number": i,
-                "strategy_name": strategy_code.get("strategy_name"),
-                "backtest_parameters": params.model_dump(),
-                "backtest_results": backtest_results.model_dump(),
+                strategy_result = {
+                    "strategy_number": i,
+                    "strategy_name": strategy_code.get("strategy_name"),
+                    "backtest_parameters": params.model_dump(),
+                    "backtest_results": backtest_results.model_dump(),
+                }
+                # logger.debug(f"Strategy {i} results: {strategy_result}")
+                all_results.append(strategy_result)
+            except:
+                logger.error(f"Backtest execution failed for strategy {i}", exc_info=True)
+                continue
+        
+        if len(all_results) == 0:
+            logger.error(f"No strategies were successfully backtested for {symbol}")
+            return {
+                "error": True,
+                "details": "No strategies were successfully backtested.",
             }
-            
-            # logger.debug(f"Strategy {i} results: {strategy_result}")
-            all_results.append(strategy_result)
-            
         analyse = analyze_backtest_results(symbol, all_results)
         logger.info(f"Backtesting completed for {symbol}")
         return analyse
@@ -159,9 +162,32 @@ def backtesting_agent(
         logger.error(error_msg, exc_info=True)
         return {
             "error": True,
-            "symbol": symbol,
-            "message": error_msg
+            "details": error_msg,
         }
 
 if __name__ == "__main__":
-    print(backtesting_agent("RELIANCE"))
+    stock_codes = [
+        "INDUSINDBK",
+        # "PATANJALI",
+        # "ITC",
+        # "AMBUJACEM",
+        # "AXISBANK",
+        # "HEROMOTOCO",
+        # "HAL",
+        # "MCDOWELL-N",
+        # "TATAMOTORS",
+        # "NTPC",
+        # "BAJAJFINSV",
+        # "RELIANCE"
+    ]
+    for stock_code in stock_codes:
+        result = backtesting_agent(
+            symbol=stock_code,
+            exchange="nse",
+            force=False,
+            backtesting_days=365*2
+        )
+        print(f"Backtesting result for {stock_code}:")
+        print(result)
+        print("=======================================")
+        print("=======================================")

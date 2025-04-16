@@ -434,11 +434,34 @@ def execute_backtesting(params: BacktestParameters) -> BacktestResult:
         strategy = process_strategy_code(params.strategy_code)
         
         # Execute strategy to get signals
-        signals = strategy(data)
+        signals = strategy(data)         
         
-        # Validate signals DataFrame
+        # Check if the output is a DataFrame
+        if not isinstance(signals, pd.DataFrame):
+            # This error means the strategy code itself is fundamentally broken
+            # or didn't return a DataFrame as required.
+            raise TypeError(f"Strategy '{strategy.__name__}' did not return a pandas DataFrame.") # Assuming strategy has a __name__
+
+        # Check if the mandatory 'Signal' column exists
         if 'Signal' not in signals.columns:
-            raise ValueError("Strategy must return DataFrame with 'Signal' column")
+            raise ValueError(f"Strategy '{strategy.__name__}' must return DataFrame with 'Signal' column")
+
+        # Check if the mandatory 'Error' column exists (as per the latest prompt)
+        if 'Error' not in signals.columns:
+            raise ValueError(f"Strategy '{strategy.__name__}' must return DataFrame with 'Error' column")
+
+        # --- Validation 2: Check for Reported Errors from Strategy ---
+
+        # Check if any non-NaN value exists in the 'Error' column.
+        # The strategy's internal try-except block should populate this with an error message string if it failed.
+        # .notna() returns True for non-NaN values (like error strings).
+        # .any() checks if at least one True exists in the resulting boolean Series.
+        if signals['Error'].notna().any():
+            # An error occurred *inside* the strategy's execution logic.
+            # Extract the first reported error message for logging/reporting.
+            first_error_message = signals['Error'].dropna().iloc[0]
+            # Raise a specific error indicating the strategy logic failed.
+            raise RuntimeError(f"Strategy '{strategy.__name__}' reported an internal execution error: {first_error_message}")
         
         # Run simulation
         trades, equity_curve = simulate_trades(data, signals, params)

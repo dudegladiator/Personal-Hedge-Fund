@@ -2,7 +2,6 @@ import json
 from typing import Any, Dict, TypedDict, Optional, Tuple
 from src.data_source.apis_2 import get_overall_fundamental_data
 from src.llm.models import get_model
-from langgraph.types import Command
 from langgraph.graph import StateGraph, START, END
 from utils.app_logger import setup_logger
 from src.prompts import peter_lynch_system_prompt

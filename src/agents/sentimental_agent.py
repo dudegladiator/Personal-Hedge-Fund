@@ -1,4 +1,5 @@
 import json
+from typing import Any, Dict
 from src.data_source.apis_2 import get_corporate_announcements, get_stock_news
 from utils.app_logger import setup_logger
 from src.llm.models import get_model
@@ -11,14 +12,14 @@ logger = setup_logger("src/agents/sentimental_agent.py")
 MODEL_PROVIDER = "GEMINI"
 MODEL_NAME = "gemini-2.0-flash"
 FORMAT = { "type": "json_object" }
- 
+
 def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, force = False):
     logger.info(f"Getting announcement recommendations for {symbol} on {exchange} for past {past_days} days")
     try:
         data = get_corporate_announcements(symbol, exchange, refresh_days=1, force=force)
         if not data:
             logger.warning(f"No data found for symbol {symbol} on {exchange}")
-            return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database.", "error": True}
         
         announcements = data
         board_meetings = announcements.get("board_meetings", [])
@@ -33,6 +34,14 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         bonus_latest = get_latest_announcements(bonus, "ex_date", days=past_days)
         rights_latest = get_latest_announcements(rights, "ex_date", days=past_days)
         
+        raw_data = {
+            "board_meetings": board_meetings,
+            "dividends": dividends,
+            "splits": splits,
+            "bonus": bonus,
+            "rights": rights
+        }
+        
         logger.info(f"Latest announcements found for {symbol}: "
                     f"Board Meetings: {len(board_meetings_latest)}, "
                     f"Dividends: {len(dividends_latest)}, "
@@ -42,7 +51,7 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         
         if not any([board_meetings_latest, dividends_latest, splits_latest, bonus_latest, rights_latest]):
             logger.warning(f"No recent announcements found for {symbol}")
-            return {"recommendation_sign": "NEUTRAL", "details": "No recent announcement data available for analysis."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No recent announcement data available for analysis.", "error": True}
         
         data_str = (
             f"Latest Board Meetings:\n{json.dumps(board_meetings_latest, indent=2)}\n\n"
@@ -84,7 +93,7 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         )
         
         response_content = completion.choices[0].message.content
-        result = parse_sentimental_response(response_content)
+        result = parse_sentimental_response(response_content, raw_data=raw_data)
         result["run_datetime"] = datetime.now().isoformat()
         
         logger.info(f"Successfully generated announcement recommendation for {symbol}")
@@ -94,20 +103,20 @@ def get_recommendation_from_announcements(symbol, exchange="nse", past_days=90, 
         logger.error(f"Error in announcement analysis for {symbol}: {str(e)}", exc_info=True)
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
     
-def get_recommendation_from_news(symbol, exchange="nse", past_days=5, force = False):
+def get_recommendation_from_news(symbol, exchange="nse", past_days=10, force = False):
     logger.info(f"Getting news recommendations for {symbol} on {exchange} for past {past_days} days")
     try:
         data = get_stock_news(symbol, exchange, refresh_days=1, force=force)
         if not data:
             logger.warning(f"No data found for symbol {symbol} on {exchange}")
-            return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No data found for the given symbol and exchange in the database.", "error": True}
         
         news = data
         news_latest = get_latest_news(news, days=past_days)
         
         if not news_latest:
             logger.warning(f"No recent news found for {symbol}")
-            return {"recommendation_sign": "NEUTRAL", "details": "No recent news data available for analysis."}
+            return {"recommendation_sign": "NEUTRAL", "details": "No recent news data available for analysis.", "error": True}
         
         logger.info(f"Latest news found for {symbol}: {len(news_latest)}")
         
@@ -147,7 +156,7 @@ def get_recommendation_from_news(symbol, exchange="nse", past_days=5, force = Fa
         )
 
         response_content = completion.choices[0].message.content
-        result = parse_sentimental_response(response_content)
+        result = parse_sentimental_response(response_content, raw_data=news_latest)
         result["run_datetime"] = datetime.now().isoformat()
         
         logger.info(f"Successfully generated news recommendation for {symbol}")
@@ -156,17 +165,52 @@ def get_recommendation_from_news(symbol, exchange="nse", past_days=5, force = Fa
     except Exception as e:
         logger.error(f"Error in news analysis for {symbol}: {str(e)}", exc_info=True)
         return {"recommendation_sign": "NEUTRAL", "details": f"An error occurred: {str(e)}", "error": True}
+
+def sentimental_agent(symbol: str, exchange: str = "nse", force: bool = False, past_days_for_news: int = 14, past_days_for_announcements: int = 90) -> Dict[str, Any]:
+    logger.info(f"Starting sentimental analysis for {symbol} on {exchange}")
     
-#Add the Agent
+    try:
+        # Get recommendation from announcements
+        announcement_result = get_recommendation_from_announcements(symbol, exchange, force=force, past_days=past_days_for_announcements)
+        
+        # Get recommendation from news
+        news_result = get_recommendation_from_news(symbol, exchange, force=force, past_days=past_days_for_news)
+        
+        # Combine results
+        combined_result = {
+            "symbol": symbol,
+            "exchange": exchange,
+            "announcement_analysis": announcement_result,
+            "news_analysis": news_result,
+            "error": False,
+            "message": "Sentimental analysis completed successfully"
+        }
+        
+        logger.info(f"Sentimental analysis completed for {symbol}")
+        return combined_result
     
+    except Exception as e:
+        logger.error(f"Error in sentimental analysis for {symbol}: {str(e)}", exc_info=True)
+        return {"error": True, "message": str(e)}
+
 # Example usage
 if __name__ == "__main__":
     # Test the announcements function
-    result1 = get_recommendation_from_announcements("RELIANCE", "nse")
-    print("Recommendation from Announcements:")
-    print(json.dumps(result1, indent=2))
-    
-    # Test the news function
-    result2 = get_recommendation_from_news("RELIANCE", "nse", 200)
-    print("\nRecommendation from News:")
-    print(json.dumps(result2, indent=2))
+    stock_codes = [
+        "INDUSINDBK",
+        # "PATANJALI",
+        # "ITC",
+        # "AMBUJACEM",
+        # "AXISBANK",
+        # "HEROMOTOCO",
+        # "HAL",
+        # "MCDOWELL-N",
+        # "TATAMOTORS",
+        # "NTPC",
+        # "BAJAJFINSV",
+        # "RELIANCE"
+    ]
+    for stock_code in stock_codes:
+        print(f"Testing announcements for {stock_code}")
+        result = sentimental_agent(stock_code, exchange="nse", force=False)
+        print(result)

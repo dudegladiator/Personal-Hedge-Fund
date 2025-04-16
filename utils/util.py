@@ -1,5 +1,6 @@
 from datetime import datetime, time, timedelta
-from typing import Any, Dict
+import math
+from typing import Any, Dict, Optional
 import pytz
 
 def indian_stock_market_open() -> bool:
@@ -74,3 +75,24 @@ def get_latest_news(news_list, days):
     
     except ValueError as e:
         return []
+    
+    
+def _safe_get_float(data: Optional[Dict], key: str) -> Optional[float]:
+    if data is None:
+        return None
+
+    value = data.get(key)
+
+    if value is None or value == "":
+        return None
+
+    try:
+        # Attempt conversion to float
+        float_value = float(value)
+        # Check for NaN or infinity which can cause issues later
+        if math.isnan(float_value) or math.isinf(float_value):
+            return None
+        return float_value
+    except (ValueError, TypeError):
+        # Handle cases where conversion is not possible (e.g., strings like "abc")
+        return None
