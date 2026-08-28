@@ -1,1 +1,1 @@
-# Hedge-Fund-Manager
+Investment Research Platform 
