@@ -1,1 +1,1 @@
-Investment Research Platform 
+Personal Hedge Fund
